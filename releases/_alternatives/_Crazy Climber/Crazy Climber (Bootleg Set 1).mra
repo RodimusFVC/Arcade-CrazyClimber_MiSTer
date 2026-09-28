@@ -1,0 +1,72 @@
+<misterromdescription>
+    <name>Crazy Climber (Bootleg Set 1)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Crazy Climber</series>
+    <year>1980</year>
+    <manufacturer>bootleg</manufacturer>
+    <category>Platform - Climb</category>
+
+    <setname>ccboot</setname>
+    <parent>cclimber</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>horizontal</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>8-way</joystick>
+    <special_controls>twin stick</special_controls>
+    <num_buttons>4</num_buttons>
+    <buttons names="R Right,R Left,R Down,R Up,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="00,01">
+        <dip name="Lives" bits="0,1" ids="3,4,5,6"/>
+        <dip name="Rack Test (Cheat)" bits="3" ids="Off,On"/>
+        <dip name="Coin A" bits="4,5" ids="1C/1C,2C/1C,3C/1C,4C/1C"/>
+        <dip name="Coin B" bits="6,7" ids="1C/1C,1C/2C,1C/3C,Free Play"/>
+        <dip name="Cabinet" bits="8" ids="Cocktail,Upright"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000, decryption PROM 0xD100 -->
+    <rom index="0" md5="none" zip="ccboot.zip|cclimber.zip">
+        <part crc="5efbe180" name="m11.bin"/>
+        <part crc="be2748c7" name="m10.bin"/>
+        <part crc="26489069" name="cc09j.bin"/>
+        <part crc="e3c542d6" name="m08.bin"/>
+        <part crc="fbc9626c" name="cc07j.bin"/>
+        <part repeat="0x1000">00</part>
+        <part crc="481b64cc" name="cc06"/>
+        <part repeat="0x800">00</part>
+        <part crc="056af36b" name="m05.bin"/>
+        <part repeat="0x800">00</part>
+        <part crc="6fb80538" name="m04.bin"/>
+        <part repeat="0x800">00</part>
+        <part crc="67127253" name="m03.bin"/>
+        <part repeat="0x800">00</part>
+        <part crc="7f4877de" name="m02.bin"/>
+        <part crc="49fab908" name="m01.bin"/>
+        <part crc="5f0bcdfb" name="cc13j.bin"/>
+        <part crc="9003ffbd" name="cc12j.bin"/>
+        <part crc="751c3325" name="cclimber.pr1"/>
+        <part crc="ab1940fa" name="cclimber.pr2"/>
+        <part crc="71317756" name="cclimber.pr3"/>
+        <part repeat="0xA0">00</part>
+        <part crc="9e11550d" name="ccboot.prm"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>00 01</part>
+    </rom>
+
+    <remark>Crazy Climber (Bootleg Set 1)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

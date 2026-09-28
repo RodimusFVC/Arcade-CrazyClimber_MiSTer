@@ -1,0 +1,65 @@
+<misterromdescription>
+    <name>Crazy Kong (SegaSA / Sonic Bootleg)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Crazy Kong</series>
+    <year>1982</year>
+    <manufacturer>bootleg (SegaSA / Sonic)</manufacturer>
+    <category>Platform</category>
+
+    <setname>ckongpt2ss</setname>
+    <parent>ckongpt2</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (ccw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>4-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Jump,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="80">
+        <dip name="Lives" bits="0,1" ids="2,3,4,5"/>
+        <dip name="Bonus Life" bits="2,3" ids="7000,10000,15000,20000"/>
+        <dip name="Coinage" bits="4,6" ids="1C/1C,2C/1C,1C/2C,3C/1C,1C/3C,4C/1C,1C/4C,5C/1C"/>
+        <dip name="Cabinet" bits="7" ids="Cocktail,Upright"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="ckongpt2ss.zip|ckongpt2.zip">
+        <part crc="b27df032" name="ck2_7.5d"/>
+        <part crc="5dc1aaba" name="ck2_8.5e"/>
+        <part crc="c9054c94" name="ck2_9.5h"/>
+        <part crc="923420cb" name="ck_10.5k"/>
+        <part crc="ae159192" name="ck2_11.5l"/>
+        <part crc="25a015d3" name="ck_12.5n"/>
+        <part crc="2dcedd12" name="ck2_6.11n"/>
+        <part crc="fa7cbd91" name="ck2_5.11l"/>
+        <part crc="3375b3bd" name="ck2_4.11k"/>
+        <part crc="5655cc11" name="ck2_3.11h"/>
+        <part crc="d1352c31" name="ck2_2.11c"/>
+        <part crc="a7a2fdbd" name="ck2_1.11a"/>
+        <part crc="5f0bcdfb" name="14.5s"/>
+        <part crc="9003ffbd" name="13.5p"/>
+        <part crc="b3fc1505" name="mb7051.v6"/>
+        <part crc="26aada9e" name="mb7051.u6"/>
+        <part crc="676b3166" name="mb7051.t6"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>01 18</part>
+    </rom>
+
+    <remark>Crazy Kong (SegaSA / Sonic Bootleg)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

@@ -1,0 +1,67 @@
+<misterromdescription>
+    <name>Donkey Kong (Spanish Bootleg of Crazy Kong)</name>
+    <region>Spain</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Crazy Kong</series>
+    <year>1981</year>
+    <manufacturer>bootleg</manufacturer>
+    <category>Platform</category>
+
+    <setname>ckongdks</setname>
+    <parent>ckong</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (ccw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>4-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Jump,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="80">
+        <dip name="Lives" bits="0,1" ids="3,4,5,6"/>
+        <dip name="Bonus Life" bits="2,3" ids="7000,10000,15000,20000"/>
+        <dip name="Coinage" bits="4,6" ids="1C/1C,2C/1C,1C/2C,3C/1C,1C/3C,4C/1C,1C/4C,5C/1C"/>
+        <dip name="Cabinet" bits="7" ids="Cocktail,Upright"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="ckongdks.zip|ckong.zip">
+        <part crc="f97ba8ae" name="ck13.bin" offset="0x800" length="0x800"/>
+        <part crc="f97ba8ae" name="ck13.bin" offset="0x0" length="0x800"/>
+        <part crc="fe89dea4" name="ck09.bin"/>
+        <part crc="b3947d06" name="ck11.bin"/>
+        <part crc="23d0657d" name="ck12.bin"/>
+        <part crc="c27a13f1" name="ck10.bin" offset="0x800" length="0x800"/>
+        <part crc="c27a13f1" name="ck10.bin" offset="0x0" length="0x800"/>
+        <part repeat="0x1000">00</part>
+        <part crc="a8916dc8" name="ck06.bin"/>
+        <part crc="cd3b5dde" name="ck05.bin"/>
+        <part crc="b62a0367" name="ck04.bin"/>
+        <part crc="61122c5e" name="ck03.bin"/>
+        <part crc="085b5f90" name="ck02.bin"/>
+        <part crc="16fd47e2" name="ck01.bin"/>
+        <part crc="31c0a7de" name="ck08.bin"/>
+        <part crc="9003ffbd" name="ck07.bin"/>
+        <part crc="751c3325" name="ck6v.bin"/>
+        <part crc="ab1940fa" name="ck6u.bin"/>
+        <part crc="b4e827a5" name="ck6t.bin"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>01 1E</part>
+    </rom>
+
+    <remark>Donkey Kong (Spanish Bootleg of Crazy Kong)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

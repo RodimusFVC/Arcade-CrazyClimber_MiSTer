@@ -1,0 +1,14 @@
+set_global_assignment -name VHDL_INPUT_VERSION VHDL_2008
+
+set_global_assignment -name SYSTEMVERILOG_FILE Arcade-CrazyClimber.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cclimber_board.sv
+
+set_global_assignment -name QIP_FILE rtl/cpu/T80/T80.qip
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/cclimber_snd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/swimmer_snd.sv
+set_global_assignment -name QIP_FILE rtl/sound/v_sound.qip
+
+set_global_assignment -name VERILOG_FILE rtl/mister_custom/pause.v
+
+set_global_assignment -name QIP_FILE rtl/ram_rom/cc_ram_rom.qip

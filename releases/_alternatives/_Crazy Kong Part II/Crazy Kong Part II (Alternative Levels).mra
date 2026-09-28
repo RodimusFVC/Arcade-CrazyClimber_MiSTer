@@ -1,0 +1,65 @@
+<misterromdescription>
+    <name>Crazy Kong Part II (Alternative Levels)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Crazy Kong</series>
+    <year>1981</year>
+    <manufacturer>bootleg</manufacturer>
+    <category>Platform</category>
+
+    <setname>ckongpt2b</setname>
+    <parent>ckongpt2</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (ccw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>4-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Jump,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="80">
+        <dip name="Lives" bits="0,1" ids="1,2,3,4"/>
+        <dip name="Bonus Life" bits="2,3" ids="7000,10000,15000,20000"/>
+        <dip name="Coinage" bits="4,6" ids="1C/1C,2C/1C,1C/2C,3C/1C,1C/3C,4C/1C,1C/4C,5C/1C"/>
+        <dip name="Cabinet" bits="7" ids="Cocktail,Upright"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="ckongpt2b.zip|ckongpt2.zip">
+        <part crc="5d96ee9a" name="d05-7.rom"/>
+        <part crc="74a8435b" name="f05-8.rom"/>
+        <part crc="e06ca575" name="h05-9.rom"/>
+        <part crc="46d83a11" name="k05-10.rom"/>
+        <part crc="07c30f3d" name="l05-11.rom"/>
+        <part crc="151de90a" name="n05-12.rom"/>
+        <part crc="2dcedd12" name="6.11n"/>
+        <part crc="fa7cbd91" name="5.11l"/>
+        <part crc="3375b3bd" name="4.11k"/>
+        <part crc="5655cc11" name="3.11h"/>
+        <part crc="d1352c31" name="2.11c"/>
+        <part crc="a7a2fdbd" name="1.11a"/>
+        <part crc="5f0bcdfb" name="14.5s"/>
+        <part crc="9003ffbd" name="13.5p"/>
+        <part crc="b3fc1505" name="prom.v6"/>
+        <part crc="26aada9e" name="prom.u6"/>
+        <part crc="676b3166" name="prom.t6"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>01 3C</part>
+    </rom>
+
+    <remark>Crazy Kong Part II (Alternative Levels) (Bootleg)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

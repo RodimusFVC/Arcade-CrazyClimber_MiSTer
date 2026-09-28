@@ -1,0 +1,70 @@
+<misterromdescription>
+    <name>River Patrol</name>
+    <region>Japan</region>
+    <homebrew>no</homebrew>
+    <bootleg>no</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>River Patrol</series>
+    <year>1981</year>
+    <manufacturer>Orca</manufacturer>
+    <category>Shooter</category>
+
+    <setname>rpatrol</setname>
+    <parent>rpatrol</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>horizontal</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>2-way horizontal</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Gas,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="90">
+        <dip name="Coinage" bits="0,1" ids="1C/1C,1C/2C,2C/1C,Free Play"/>
+        <dip name="Lives" bits="2,3" ids="3,4,5,6"/>
+        <dip name="Cabinet" bits="4" ids="Cocktail,Upright"/>
+        <dip name="Unknown 1" bits="5" ids="Off,On"/>
+        <dip name="Unknown 2" bits="6" ids="Off,On"/>
+        <dip name="Memory Test" bits="7" ids="Retry on Error,Stop on Error"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="rpatrol.zip">
+        <part crc="065197f0" name="1.1h"/>
+        <part crc="3614b820" name="2.1f"/>
+        <part crc="ba428bbf" name="3.1d"/>
+        <part crc="41497a94" name="4.1c"/>
+        <part crc="e20ee7e7" name="5.1a"/>
+        <part repeat="0x1000">00</part>
+        <part crc="b38d8aca" name="6.6l.2732" offset="0x0" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="b38d8aca" name="6.6l.2732" offset="0x800" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="bc2bddf9" name="7.6p.2732" offset="0x0" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="bc2bddf9" name="7.6p.2732" offset="0x800" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="59747c31" name="8.2s"/>
+        <part crc="065651a5" name="9.2t"/>
+        <part repeat="0x2000">00</part>
+        <part crc="f9a2383b" name="mb7051.1b"/>
+        <part crc="1743bd26" name="mb7051.1c"/>
+        <part crc="ee03bc96" name="mb7051.1u"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>02 02</part>
+    </rom>
+
+    <remark>River Patrol (Japan) (Orca)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

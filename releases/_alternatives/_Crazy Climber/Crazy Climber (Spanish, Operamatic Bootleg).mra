@@ -1,0 +1,70 @@
+<misterromdescription>
+    <name>Crazy Climber (Spanish, Operamatic Bootleg)</name>
+    <region>Spain</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Crazy Climber</series>
+    <year>1980</year>
+    <manufacturer>bootleg (Operamatic)</manufacturer>
+    <category>Platform - Climb</category>
+
+    <setname>cclimbroper</setname>
+    <parent>cclimber</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>horizontal</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>8-way</joystick>
+    <special_controls>twin stick</special_controls>
+    <num_buttons>4</num_buttons>
+    <buttons names="R Right,R Left,R Down,R Up,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="00,01">
+        <dip name="Lives" bits="0,1" ids="3,4,5,6"/>
+        <dip name="Rack Test (Cheat)" bits="3" ids="Off,On"/>
+        <dip name="Coin A" bits="4,5" ids="1C/1C,2C/1C,3C/1C,4C/1C"/>
+        <dip name="Coin B" bits="6,7" ids="1C/1C,1C/2C,1C/3C,Free Play"/>
+        <dip name="Cabinet" bits="8" ids="Cocktail,Upright"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="cclimbroper.zip|cclimber.zip">
+        <part crc="f94b96e8" name="cc5-2532.cpu"/>
+        <part crc="4b1abea6" name="cc4-2532.cpu"/>
+        <part crc="5612bb3c" name="cc3-2532.cpu"/>
+        <part crc="653cebc4" name="cc2-2532.cpu"/>
+        <part crc="3fcf912b" name="cc1-2532.cpu"/>
+        <part repeat="0x1000">00</part>
+        <part crc="9324846d" name="cc13-2716.cpu"/>
+        <part repeat="0x800">00</part>
+        <part crc="6d15ba36" name="cc12-2716.cpu"/>
+        <part repeat="0x800">00</part>
+        <part crc="25886f13" name="cc11-2716.cpu"/>
+        <part repeat="0x800">00</part>
+        <part crc="437471ec" name="cc10-2716.cpu"/>
+        <part repeat="0x800">00</part>
+        <part crc="a546a18f" name="cc9-2716.cpu"/>
+        <part crc="0224e507" name="cc8-2716.cpu"/>
+        <part crc="5f0bcdfb" name="cc7-2532.cpu"/>
+        <part crc="9003ffbd" name="cc6-2532.cpu"/>
+        <part crc="751c3325" name="cclimber.pr1"/>
+        <part crc="ab1940fa" name="cclimber.pr2"/>
+        <part crc="71317756" name="cclimber.pr3"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>00 00</part>
+    </rom>
+
+    <remark>Crazy Climber (Spanish, Operamatic Bootleg)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

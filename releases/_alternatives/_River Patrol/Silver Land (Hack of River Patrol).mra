@@ -1,0 +1,70 @@
+<misterromdescription>
+    <name>Silver Land (Hack of River Patrol)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>River Patrol</series>
+    <year>1981</year>
+    <manufacturer>Falcon</manufacturer>
+    <category>Shooter</category>
+
+    <setname>silvland</setname>
+    <parent>rpatrol</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>horizontal</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>2-way horizontal</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Gas,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="90">
+        <dip name="Coinage" bits="0,1" ids="1C/1C,1C/2C,2C/1C,Free Play"/>
+        <dip name="Lives" bits="2,3" ids="3,4,5,6"/>
+        <dip name="Cabinet" bits="4" ids="Cocktail,Upright"/>
+        <dip name="Unknown 1" bits="5" ids="Off,On"/>
+        <dip name="Unknown 2" bits="6" ids="Off,On"/>
+        <dip name="Memory Test" bits="7" ids="Retry on Error,Stop on Error"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="silvland.zip|rpatrol.zip">
+        <part crc="57e6be62" name="7.2r"/>
+        <part crc="bbb2b287" name="8.1n"/>
+        <part crc="8fa300df" name="rp3.4f"/>
+        <part crc="5536a65d" name="10.2n"/>
+        <part crc="6f23f66f" name="11.1r"/>
+        <part crc="26f1537c" name="12.2k"/>
+        <part crc="affb804f" name="6.6n"/>
+        <part repeat="0x800">00</part>
+        <part crc="ad4642e5" name="5.6l"/>
+        <part repeat="0x800">00</part>
+        <part crc="e487579d" name="4.6k"/>
+        <part repeat="0x800">00</part>
+        <part crc="59125a1a" name="3.6h"/>
+        <part repeat="0x800">00</part>
+        <part crc="c8d32b8e" name="2.6c"/>
+        <part crc="ee333daf" name="1.6a"/>
+        <part repeat="0x2000">00</part>
+        <part crc="1d2343b1" name="mb7051.1v"/>
+        <part crc="c174753c" name="mb7051.1u"/>
+        <part crc="04a1be01" name="mb7051.1t"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>02 00</part>
+    </rom>
+
+    <remark>Silver Land (Hack of River Patrol) (Falcon)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

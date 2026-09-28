@@ -1,0 +1,70 @@
+<misterromdescription>
+    <name>River Patrol (Bootleg)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>River Patrol</series>
+    <year>1981</year>
+    <manufacturer>bootleg</manufacturer>
+    <category>Shooter</category>
+
+    <setname>rpatrolb</setname>
+    <parent>rpatrol</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>horizontal</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>2-way horizontal</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Gas,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="90">
+        <dip name="Coinage" bits="0,1" ids="1C/1C,1C/2C,2C/1C,Free Play"/>
+        <dip name="Lives" bits="2,3" ids="3,4,5,6"/>
+        <dip name="Cabinet" bits="4" ids="Cocktail,Upright"/>
+        <dip name="Unknown 1" bits="5" ids="Off,On"/>
+        <dip name="Unknown 2" bits="6" ids="Off,On"/>
+        <dip name="Memory Test" bits="7" ids="Retry on Error,Stop on Error"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="rpatrolb.zip|rpatrol.zip">
+        <part crc="bfd7ae7a" name="rp1.4l"/>
+        <part crc="03f53340" name="rp2.4j"/>
+        <part crc="8fa300df" name="rp3.4f"/>
+        <part crc="74a8f1f4" name="rp4.4e"/>
+        <part crc="d7ef6c87" name="rp5.4c"/>
+        <part repeat="0x1000">00</part>
+        <part crc="19f18e9e" name="rp6.6n"/>
+        <part repeat="0x800">00</part>
+        <part crc="07f2070d" name="rp7.6l"/>
+        <part repeat="0x800">00</part>
+        <part crc="008738c7" name="rp8.6k"/>
+        <part repeat="0x800">00</part>
+        <part crc="ea5aafca" name="rp9.6h"/>
+        <part repeat="0x800">00</part>
+        <part crc="065651a5" name="rp11.6c"/>
+        <part crc="59747c31" name="rp10.6a"/>
+        <part repeat="0x2000">00</part>
+        <part crc="f9a2383b" name="bprom1.9n"/>
+        <part crc="1743bd26" name="bprom2.9p"/>
+        <part crc="ee03bc96" name="bprom3.9c"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>02 00</part>
+    </rom>
+
+    <remark>River Patrol (Bootleg)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>
