@@ -25,7 +25,7 @@ module cclimber_board
     input               tangramq,       // Tangram Q: SYSTEM ports at 8000/8020, SNK sound board, 4K big sprite planes
     input               yamato,         // Yamato: Sega 315-5018 CPU, 12-bit palette, gradient background, polled sound board
     input               toprollr,       // Top Roller: banked 315-5018 CPU, extra bg layer, 56 sprites (toprollr_video.sv)
-    input               bagmanf,        // Le Bagnard: CK board rewired to Bagman's map, per-tile colour RAM, IRQ, TMS5110 speech
+    input               bagmanf,        // Le Bagnard: Bagman map on the CK board, TMS5110 speech
     input               decrypt_en,     // dm7052 opcode decryption PROM fitted
     input         [1:0] rom_xor,        // 0 none, 1 rpatrol, 2 ckongb, 3 dking
     input               vol5_en,        // volume D4 resistor fitted
@@ -469,7 +469,7 @@ always_comb begin
                            cannonb ? 8'h00 : bs_ram_do;   // Cannon Ball big sprite RAM is write-only
         5'b10010: cpu_di = tile_ram_do;
         5'b10011: cpu_di = (bagmanf && cpu_addr[10:0] == 11'd0) ? in_sys : color_ram_do;
-        5'b10100: cpu_di = bagmanf ? 8'h3F : in_p1;       // Le Bagnard: MAME returns 0x3F (parent's PAL16R6)
+        5'b10100: cpu_di = bagmanf ? 8'h3F : in_p1;       // Le Bagnard: fixed 0x3F (MAME)
         5'b10101: cpu_di = bagmanf ? 8'hFF : in_p2;
         5'b10110: cpu_di = in_dsw;
         5'b10111: cpu_di = bagmanf ? 8'hFF : in_sys;
@@ -1339,7 +1339,7 @@ tms5110 tms
     .sample(tms_out)
 );
 
-// MAME bagman: AY 0.40, TMS5110 1.0; the CK mix carries the AY at 0.5, so speech goes in 1:1, saturated
+// Speech added 1:1 to the CK mix (MAME bagman: AY 0.40, TMS5110 1.0), saturated
 wire signed [16:0] bg_sum   = cc_audio + tms_out;
 wire signed [15:0] bg_audio = (bg_sum > 17'sd32767) ? 16'sd32767 : (bg_sum < -17'sd32768) ? -16'sd32768 : bg_sum[15:0];
 

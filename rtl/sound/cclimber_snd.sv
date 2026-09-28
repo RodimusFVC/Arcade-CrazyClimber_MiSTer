@@ -23,7 +23,7 @@ module cclimber_snd
     input         [7:0] cpu_do,
     input               trigger,        // LS259 Q4
     input               vol5_en,        // volume D4 (47K) fitted
-    input               toprollr,       // Top Roller: 12 MHz board, AY 1.5 MHz, sample base = AY clock / 4, ROM on ioctl index 7
+    input               toprollr,       // Top Roller: AY 1.5 MHz, sample base AY / 4, ROM on index 7
 
     input        [24:0] ioctl_addr,
     input         [7:0] ioctl_dout,

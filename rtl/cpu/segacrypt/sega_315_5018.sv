@@ -1,16 +1,10 @@
 //============================================================================
 //
 //  Sega 315-5018 encrypted Z80 (Yamato, Top Roller) - opcode/data decryption
-//  Structure taken from the HW-proven SegaG80 segag80_5028.sv; table from MAME
-//  Ported 1:1 from MAME src/devices/machine/segacrpt_device.cpp
-//  (sega_315_5018_device::decrypt convtable + the shared decode() routine).
+//  Copyright (C) 2026 Rodimus
 //
-//  The cipher permutes/inverts D3, D5 and D7 only, selected by M1 and address
-//  bits A0/A4/A8/A12.  D0,D1,D2,D4,D6 pass through untouched.  Only the
-//  $0000-$7FFF window is encrypted (MAME m_decode_size = 0x8000); $8000+ is
-//  plaintext.  Opcode fetches and data reads use different halves of the
-//  table, so this is a pure combinational function - no decrypted ROM copy
-//  is needed, unlike MAME which pre-expands into a second buffer.
+//  Port of MAME src/devices/machine/segacrpt_device.cpp (BSD-3-Clause;
+//  Nicola Salmoria, David Haywood). Only D3/D5/D7 of 0000-7FFF change.
 //
 //    row = {A12,A8,A4,A0}                 (table pair select)
 //    col = {D5,D3}, mirrored when D7 set  (entry within the pair)

@@ -1,16 +1,15 @@
 //============================================================================
-// TMS5110A LPC speech synthesizer
 //
-// Port of MAME devices/sound/tms5110.cpp (TMS5110A coefficients, default
-// non-"perfect interpolation" generator): parse_frame, interpolation,
-// excitation, 20-step LFSR, lattice filter, analog clip, PDC/CTL commands.
-// Replaces Dar's lpc10_speech_synthetizer (2014, TMC0280 tables, no interpolation).
+//  TMS5110A LPC speech synthesizer
+//  Copyright (C) 2026 Rodimus
 //
-// ce_sample = one output sample (chip clock / 80, 8 kHz at 640 kHz).
-// The VSM side is a bit stream: m0 pulses advance the external address,
-// data_bit is sampled BIT_WAIT clocks later (MAME new_int_read).
-// busy is high while a sample or command is in flight so the VSM/PROM
-// state machine can hold its own clock until the step is atomic (as in MAME).
+//  Port of MAME devices/sound/tms5110.cpp (BSD-3-Clause; Frank Palazzolo,
+//  Jarek Burczynski, Aaron Giles, Jonathan Gevaryahu, Couriersud)
+//
+//  ce_sample   one output sample (chip clock / 80)
+//  m0          advances the VSM address; data_bit is sampled BIT_WAIT clocks later
+//  busy        high while a sample or command is in flight (VSM holds its clock)
+//
 //============================================================================
 
 module tms5110 #(parameter BIT_WAIT = 4)
@@ -255,7 +254,7 @@ endtask
 
 task automatic start_speak(input slow);
     begin
-        SPEN <= 1; TALK <= 1;                       // FAST_START_HACK
+        SPEN <= 1; TALK <= 1;                       // TALK at once (MAME FAST_START_HACK)
         zpar <= 1; uv_zpar <= 1; OLDE <= 1; OLDP <= 1;
         subc_reload <= ~slow;
     end

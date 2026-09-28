@@ -17,9 +17,16 @@ from pathlib import Path
 
 MAME_VERSION = "0289"
 HISCORE_DAT = Path("/CybertronMD/Mame/plugins/hiscore/hiscore.dat")   # current file (user, 2026-09-27)
-# hiscore.v header (Arabian's, proven): START_WAIT 0000FFFF, CHECK_WAIT 00FF, CHECK_HOLD 2, WRITE_HOLD 2,
-# WRITE_REPEATCOUNT 1, WRITE_REPEATWAIT 1111, PAUSEPAD 0, CHANGEMASK 0
-HISCORE_HEADER = "00 00 FF FF 00 FF 00 02 00 02 00 01 11 11 00 00"
+# hiscore.v header after START_WAIT: CHECK_WAIT 00FF, CHECK_HOLD 2, WRITE_HOLD 2, WRITE_REPEATCOUNT 1,
+# WRITE_REPEATWAIT 1111, PAUSEPAD 0, CHANGEMASK 0
+HISCORE_HEADER_TAIL = "00 FF 00 02 00 02 00 01 11 11 00 00"
+# Work RAM survives a core reload, so stale scores can pass the start/end check before the game has run its
+# RAM test and table init. START_WAIT must pass the last boot-time write to the table: frame measured in MAME
+# (write taps on the hiscore.dat ranges, 30 s), per table layout, + 2 frames: later misses the first score screen.
+HISCORE_INIT_FRAME = {"bigkong": 6, "cannonb": 15, "ccboot": 1, "ccboot2": 1, "ccbootmr": 460, "ckong": 6,
+                      "guzzler": 111, "rpatrol": 157, "rpatrolb": 157, "silvland": 157, "swimmer": 151,
+                      "yamato": 3, "bagmanf": 7}
+CLK_HZ, FRAME_HZ = 49_152_000, 60.61
 
 # region -> (base in ioctl index 0, size taken)
 REGIONS = {
@@ -259,11 +266,16 @@ def hiscore_xml(g):
     rows = "\n".join(f"            {a >> 24 & 0xFF:02X} {a >> 16 & 0xFF:02X} {a >> 8 & 0xFF:02X} {a & 0xFF:02X} "
                       f"{n >> 8:02X} {n & 0xFF:02X} {s:02X} {e:02X}" for a, n, s, e in ents)
     total = sum(n for _, n, _, _ in ents)
+    ref = next((k for k in HISCORE_INIT_FRAME if HISCORES.get(k) == lines), None)
+    if ref is None:
+        raise SystemExit(f'{g["name"]}: no measured table-init frame for this hiscore layout')
+    wait = round((HISCORE_INIT_FRAME[ref] + 2) / FRAME_HZ * CLK_HZ)
+    header = " ".join(f"{b:02X}" for b in wait.to_bytes(4, "big")) + " " + HISCORE_HEADER_TAIL
     return f"""
     <!-- Index 3: hiscore config (MAME hiscore.dat), index 4: saved scores -->
     <rom index="3" md5="none">
         <part>
-            {HISCORE_HEADER}
+            {header}
 {rows}
         </part>
     </rom>

@@ -255,7 +255,7 @@ wire m_b2_2   = joystick_1[5];
 wire m_b3_2   = joystick_1[6];
 wire m_b4_2   = joystick_1[7];
 
-// Right analog stick drives the right hand, same thresholds as The Tower on DECO Cassette
+// Right analog stick drives the right hand
 wire signed [7:0] rx0 = joystick_r_analog_0[7:0], ry0 = joystick_r_analog_0[15:8];
 wire signed [7:0] rx1 = joystick_r_analog_1[7:0], ry1 = joystick_r_analog_1[15:8];
 wire [3:0] rstick0 = {ry0 > 8'sd48, ry0 < -8'sd48, rx0 < -8'sd48, rx0 > 8'sd48};  // {D,U,L,R}
@@ -455,8 +455,7 @@ cclimber_board board
 	.hs_write(hs_write_enable)
 );
 
-// HISCORE SYSTEM - config = MRA index 3, dump = index 4 (MAME hiscore.dat, CPU addresses).
-// The board gives the module a second port on the work RAMs and video RAM, used while it holds the CPU paused.
+// Hiscore: config = MRA index 3, dump = index 4; RAM via the board's second port while the CPU is paused
 wire [15:0] hs_address;
 wire  [7:0] hs_data_in;
 wire  [7:0] hs_data_out;

@@ -1,10 +1,12 @@
 //============================================================================
-// TMS5110 VSM emulator: PROM-driven CTL/PDC sequencer + bit-serial speech ROM
 //
-// Port of MAME devices/sound/tms5110.cpp tmsprom_device as wired by Bagman
-// (bagman.cpp): rom_size 0x1000, pdc bit 1, ctl1/ctl4 bit 8 (always 0),
-// ctl2/ctl8 bit 2, reset bit 6, stop bit 7. The 32x8 PROM is held here.
-// A romclk tick waits while the chip is busy so each chip step stays atomic.
+//  TMS5110 VSM: PROM-driven CTL/PDC sequencer + bit-serial speech ROMs
+//  Copyright (C) 2026 Rodimus
+//
+//  Port of MAME devices/sound/tms5110.cpp tmsprom_device (BSD-3-Clause;
+//  Frank Palazzolo, Jarek Burczynski, Aaron Giles, Jonathan Gevaryahu,
+//  Couriersud), wired as MAME bagman.cpp
+//
 //============================================================================
 
 module tmsprom

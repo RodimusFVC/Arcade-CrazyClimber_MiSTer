@@ -3,14 +3,8 @@
 //  Top Roller (Jaleco 8307-B) video: 56-sprite line engine + scrolling background
 //  Copyright (C) 2026 Rodimus
 //
-//  BEST EFFORT WITHOUT SCHEMATICS AVAILABLE. Behaviour follows MAME cclimber.cpp
-//  (toprollr_draw_sprites, toproller_get_bg_tile_info, screen_update_toprollr),
-//  which has been compared against real-board footage (mametesters 08344), plus
-//  board photos. The 256x2 PROM at S9 (likely priority) is not emulated, as in MAME.
-//
-//  Sprites: each line, a ping-pong line buffer is cleared and the 56 sprites are
-//  drawn in MAME's order (55 down to 0, later ones overwrite), for the next line.
-//  Background: tilemap with one X scroll (bg_vram[0]), every tile X-flipped.
+//  BEST EFFORT WITHOUT SCHEMATICS AVAILABLE. Behaviour per MAME cclimber.cpp
+//  (Nicola Salmoria); the 256x2 PROM at S9 is not emulated, as in MAME.
 //
 //============================================================================
 
