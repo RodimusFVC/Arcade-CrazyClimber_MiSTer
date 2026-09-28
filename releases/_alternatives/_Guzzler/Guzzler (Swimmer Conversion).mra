@@ -1,0 +1,70 @@
+<misterromdescription>
+    <name>Guzzler (Swimmer Conversion)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>no</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Guzzler</series>
+    <year>1983</year>
+    <manufacturer>Tehkan</manufacturer>
+    <category>Maze</category>
+
+    <setname>guzzlers</setname>
+    <parent>guzzler</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (cw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>4-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="00,10">
+        <dip name="Lives" bits="0,1" ids="3,4,5,Infinite (Cheat)"/>
+        <dip name="Bonus Life" bits="2,3" ids="30K Every 100K,20K Every 50K,30K Only,None"/>
+        <dip name="Coin A" bits="4,5" ids="1C/1C,2C/1C,1C/2C,1C/3C"/>
+        <dip name="Coin B" bits="6,7" ids="1C/1C,1C/2C,1C/3C,1C/6C"/>
+        <dip name="Cabinet" bits="12" ids="Cocktail,Upright"/>
+        <dip name="High Score Names" bits="13" ids="10 Letters,3 Letters"/>
+        <dip name="Difficulty" bits="14,15" ids="Easy,Medium,Hard,Hardest"/>
+    </switches>
+
+    <!-- Index 2: CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tiles 0xB000, big sprite 0xE000, palette PROMs 0x11000 -->
+    <rom index="2" md5="none" zip="guzzlers.zip|guzzler.zip">
+        <part crc="48f751ee" name="guzz1.l9"/>
+        <part crc="c13f23e6" name="guzz2.k9"/>
+        <part crc="7a523fd8" name="guzz3.j9"/>
+        <part crc="d2bb2204" name="guzz4.f9"/>
+        <part crc="09856fd0" name="guzz5.e9"/>
+        <part crc="80990d1e" name="guzz6.d9"/>
+        <part crc="fe37b99d" name="guzz7.c9"/>
+        <part crc="8d44f5f8" name="guzz8.a9"/>
+        <part crc="61ee00b7" name="guzz-16.bin"/>
+        <part crc="f3754d9e" name="guzz-12.bin"/>
+        <part crc="afc464e2" name="guzz-13.bin"/>
+        <part crc="acbdfe1f" name="guzz-14.bin"/>
+        <part crc="66978c05" name="guzz-15.bin"/>
+        <part crc="ec2e9d86" name="guzz-11.bin"/>
+        <part crc="bd3f0bf7" name="guzz-10.bin"/>
+        <part crc="18927579" name="guzz-09.bin"/>
+        <part crc="f86930c1" name="guzzler.003"/>
+        <part crc="b566ea9e" name="guzzler.002"/>
+        <part crc="51cd9980" name="c.c12"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>03 D0</part>
+    </rom>
+
+    <remark>Guzzler (Swimmer Conversion) (Tehkan)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

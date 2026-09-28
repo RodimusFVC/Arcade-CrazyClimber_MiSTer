@@ -136,11 +136,11 @@ always_ff @(posedge clk) begin
         if (vcnt == 9'd511)      video_vs <= 1'b0;
         else if (vcnt == 9'd250) video_vs <= 1'b1;
 
-        // +8 for the shift register, +1 pixel
+        // +8 for the shift register, +1 pixel; vcnt has already stepped, so rows shown are 272..495 (y 16..239)
         if (hcnt == 9'd137) video_hblank <= 1'b1;
         else if (hcnt == 9'd264) begin
             video_hblank <= 1'b0;
-            if (vcnt == 9'd496)      video_vblank <= 1'b1;
+            if (vcnt == 9'd497)      video_vblank <= 1'b1;
             else if (vcnt == 9'd273) video_vblank <= 1'b0;
         end
     end
@@ -610,6 +610,11 @@ reg        bs_ram_we = 1'b0;
 reg  [7:0] bs_tile_code = 8'd0, bs_tile_code_r = 8'd0;
 reg  [7:0] bs_graph1 = 8'd0, bs_graph2 = 8'd0, bs_graph3 = 8'd0;
 reg  [7:0] bs_graph1_d = 8'd0, bs_graph2_d = 8'd0, bs_graph3_d = 8'd0;
+
+// Visibility (MAME: only the lower-right quadrant of the 32x32 map) travels with the tile through the
+// same pipeline stages as its pixels, so the window edge lands exactly on the map tile boundary
+reg        bs_vis_addr = 1'b0, bs_vis_code = 1'b0, bs_vis_r = 1'b0, bs_vis_g = 1'b0;
+reg  [7:0] bs_vis_d = 8'd0;
 wire [7:0] bs_rom0_do, bs_rom1_do, bs_rom2_do;
 
 reg [7:0] xy_big_sprite;
@@ -631,7 +636,11 @@ always_ff @(posedge clk) begin
         bs_ram_we <= 1'b0;
         if (x_pixel == 3'b000) begin
             bs_ram_addr <= xy_big_sprite;
-            if (ena_pixel) bs_tile_code <= bs_ram_do;
+            bs_vis_addr <= ~x_bs_cnt[7];
+            if (ena_pixel) begin
+                bs_tile_code <= bs_ram_do;
+                bs_vis_code  <= bs_vis_addr;
+            end
         end else begin
             bs_ram_addr <= cpu_addr[7:0];
             bs_ram_we   <= mem_wr & bsram_cs;
@@ -657,6 +666,8 @@ always_ff @(posedge clk) begin
 
         if (x_bs_cnt[2:0] == 3'b111 && ena_pixel) begin
             bs_tile_code_r <= bs_tile_code;
+            bs_vis_r       <= bs_vis_code;
+            bs_vis_g       <= bs_vis_r;
             bs_graph1      <= attr_big_sprite[4] ? bs_rom0_do : bitrev8(bs_rom0_do);
             bs_graph2      <= attr_big_sprite[4] ? bs_rom1_do : bitrev8(bs_rom1_do);
             bs_graph3      <= attr_big_sprite[4] ? bs_rom2_do : bitrev8(bs_rom2_do);
@@ -705,6 +716,7 @@ always_ff @(posedge clk) begin
         bs_graph1_d <= {bs_graph1_d[6:0], bs_graph1[x_bs_cnt[2:0]]};
         bs_graph2_d <= {bs_graph2_d[6:0], bs_graph2[x_bs_cnt[2:0]]};
         bs_graph3_d <= {bs_graph3_d[6:0], bs_graph3[x_bs_cnt[2:0]]};
+        bs_vis_d    <= {bs_vis_d[6:0], bs_vis_g};
     end
 end
 
@@ -714,13 +726,14 @@ wire [4:0] bs_pixel_color = swimmer ? {attr_big_sprite[1:0], bs_graph1_d[bs_sel]
                                     : {attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel]};
 
 reg [4:0] bs_pixel_color_r = 5'd0;
+reg       bs_pixel_vis_r = 1'b0;
 reg       is_big_sprite_on = 1'b0;
 
 always_ff @(posedge clk) begin
     if (ce12) begin
         bs_pixel_color_r <= bs_pixel_color;
-        is_big_sprite_on <= pix_on(swimmer, {3'b000, bs_pixel_color_r}) && y_line_bs[7] &&
-                            (x_bs_cnt >= 8'h1F) && (x_bs_cnt < 8'h9F);
+        bs_pixel_vis_r   <= bs_vis_d[bs_sel];
+        is_big_sprite_on <= pix_on(swimmer, {3'b000, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r;
     end
 end
 

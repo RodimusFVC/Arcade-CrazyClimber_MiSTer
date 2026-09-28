@@ -1,0 +1,73 @@
+<misterromdescription>
+    <name>Swimmer (Set 3)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>no</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Swimmer</series>
+    <year>1982</year>
+    <manufacturer>Tehkan</manufacturer>
+    <category>Action</category>
+
+    <setname>swimmerb</setname>
+    <parent>swimmer</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>horizontal</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>8-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="00,70">
+        <dip name="Lives" bits="0,1" ids="3,4,5,Infinite (Cheat)"/>
+        <dip name="Bonus Life" bits="2,3" ids="10000,20000,30000,None"/>
+        <dip name="Coin A" bits="4,5" ids="1C/1C,2C/1C,1C/2C,1C/3C"/>
+        <dip name="Coin B" bits="6,7" ids="1C/1C,1C/2C,1C/3C,1C/6C"/>
+        <dip name="Cabinet" bits="12" ids="Cocktail,Upright"/>
+        <dip name="Demo Sounds" bits="13" ids="Off,On"/>
+        <dip name="Difficulty" bits="14" ids="Easy,Hard"/>
+    </switches>
+
+    <!-- Index 2: CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tiles 0xB000, big sprite 0xE000, palette PROMs 0x11000 -->
+    <rom index="2" md5="none" zip="swimmerb.zip|swimmer.zip">
+        <part crc="b045be08" name="sw1.9l"/>
+        <part crc="163d65e5" name="sw2.9k"/>
+        <part crc="631d74e9" name="sw3.9j"/>
+        <part crc="d62634db" name="sw4.9f"/>
+        <part crc="922d5d87" name="sw5.9e"/>
+        <part crc="85478209" name="sw6.9d"/>
+        <part crc="88266f2e" name="sw7.9c"/>
+        <part crc="191a16e4" name="sw8.9a"/>
+        <part repeat="0x2000">00</part>
+        <part crc="2eee9bcb" name="sw12.4k"/>
+        <part crc="4f3608cb" name="sw15.18k"/>
+        <part crc="7181c8b4" name="sw14.18l"/>
+        <part crc="2eb1af5c" name="sw13.18m"/>
+        <part crc="9ca67e24" name="sw23.6c"/>
+        <part repeat="0x800">00</part>
+        <part crc="02c10992" name="sw22.5c"/>
+        <part repeat="0x800">00</part>
+        <part crc="7f4993c1" name="sw21.4c"/>
+        <part repeat="0x800">00</part>
+        <part crc="8e35b97d" name="24s10.13b"/>
+        <part crc="c5f24909" name="24s10.13a"/>
+        <part crc="3b2deb3a" name="18s030.12c"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>03 40</part>
+    </rom>
+
+    <remark>Swimmer (Set 3) (Tehkan)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>
