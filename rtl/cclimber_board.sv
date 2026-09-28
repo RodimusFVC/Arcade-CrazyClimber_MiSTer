@@ -439,8 +439,9 @@ reg       tile_ram_we = 1'b0;
 always_ff @(posedge clk) begin
     if (ce12) begin
         tile_ram_we <= 1'b0;
+        // Y flip (attr bit 7) swaps the two characters of a row pair, as the pair shares one attribute (MAME tile_index ^ 0x20)
         if (x_pixel == 3'b100)
-            tile_ram_addr <= {y_line_shift[7:3], x_tile_v};
+            tile_ram_addr <= {y_line_shift[7:4], y_line_shift[3] ^ attr_sp_bg[7], x_tile_v};
         else begin
             tile_ram_addr <= cpu_addr[9:0];
             tile_ram_we   <= mem_wr & tile_cs;
