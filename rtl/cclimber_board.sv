@@ -23,6 +23,7 @@ module cclimber_board
     input               cannonb,        // Cannon Ball: CK board, chars/sprites split per plane, one flip bit
     input               cb_xor,         // Cannon Ball set 1: first program ROM XORed by address
     input               tangramq,       // Tangram Q: SYSTEM ports at 8000/8020, SNK sound board, 4K big sprite planes
+    input               yamato,         // Yamato: Sega 315-5018 CPU, 12-bit palette, gradient background, polled sound board
     input               decrypt_en,     // dm7052 opcode decryption PROM fitted
     input         [1:0] rom_xor,        // 0 none, 1 rpatrol, 2 ckongb, 3 dking
     input               vol5_en,        // volume D4 resistor fitted
@@ -40,6 +41,7 @@ module cclimber_board
     input               ioctl_wr0,      // ioctl index 0 (Crazy Climber layout)
     input               ioctl_wr2,      // ioctl index 2 (Swimmer layout)
     input               ioctl_wr5,      // ioctl index 5 (Tangram Q layout)
+    input               ioctl_wr6,      // ioctl index 6 (Yamato layout)
 
     output        [7:0] video_r,
     output        [7:0] video_g,
@@ -110,25 +112,49 @@ selector_tangramq rom_sel_tq
 
 wire dl_tq_snd = ioctl_wr5 & tq_snd_cs;
 
-wire dl_prog   = (ioctl_wr0 & prog_cs) | (ioctl_wr2 & sw_prog_cs) | (ioctl_wr5 & tq_prog_cs);
+wire ym_prog_cs, ym_tile0_cs, ym_tile1_cs, ym_bs0_cs, ym_bs1_cs, ym_snd_cs, ym_grad0_cs, ym_grad1_cs;
+wire ym_pal_rg_cs, ym_pal_b_cs, ym_bspal_cs;
+
+selector_yamato rom_sel_ym
+(
+    .ioctl_addr(ioctl_addr),
+    .prog_cs(ym_prog_cs),
+    .tile0_cs(ym_tile0_cs),
+    .tile1_cs(ym_tile1_cs),
+    .bs0_cs(ym_bs0_cs),
+    .bs1_cs(ym_bs1_cs),
+    .snd_cs(ym_snd_cs),
+    .grad0_cs(ym_grad0_cs),
+    .grad1_cs(ym_grad1_cs),
+    .pal_rg_cs(ym_pal_rg_cs),
+    .pal_b_cs(ym_pal_b_cs),
+    .bspal_cs(ym_bspal_cs)
+);
+
+wire dl_ym_snd   = ioctl_wr6 & ym_snd_cs;
+wire dl_ym_grad0 = ioctl_wr6 & ym_grad0_cs;
+wire dl_ym_grad1 = ioctl_wr6 & ym_grad1_cs;
+wire dl_ym_pal_b = ioctl_wr6 & ym_pal_b_cs;
+
+wire dl_prog   = (ioctl_wr0 & prog_cs) | (ioctl_wr2 & sw_prog_cs) | (ioctl_wr5 & tq_prog_cs) | (ioctl_wr6 & ym_prog_cs);
 wire dl_himem  = ioctl_wr2 & sw_himem_cs;
 wire dl_snd    = ioctl_wr2 & sw_snd_cs;
-wire dl_tile0  = (ioctl_wr0 & tile0_cs) | (ioctl_wr2 & sw_tile_cs[0]) | (ioctl_wr5 & tq_tile0_cs);
-wire dl_tile1  = (ioctl_wr0 & tile1_cs) | (ioctl_wr2 & sw_tile_cs[1]) | (ioctl_wr5 & tq_tile1_cs);
+wire dl_tile0  = (ioctl_wr0 & tile0_cs) | (ioctl_wr2 & sw_tile_cs[0]) | (ioctl_wr5 & tq_tile0_cs) | (ioctl_wr6 & ym_tile0_cs);
+wire dl_tile1  = (ioctl_wr0 & tile1_cs) | (ioctl_wr2 & sw_tile_cs[1]) | (ioctl_wr5 & tq_tile1_cs) | (ioctl_wr6 & ym_tile1_cs);
 wire dl_tile2  = ioctl_wr2 & sw_tile_cs[2];
-wire dl_bs0    = (ioctl_wr0 & bs0_cs) | (ioctl_wr2 & sw_bs_cs[0]) | (ioctl_wr5 & tq_bs0_cs);
-wire dl_bs1    = (ioctl_wr0 & bs1_cs) | (ioctl_wr2 & sw_bs_cs[1]) | (ioctl_wr5 & tq_bs1_cs);
+wire dl_bs0    = (ioctl_wr0 & bs0_cs) | (ioctl_wr2 & sw_bs_cs[0]) | (ioctl_wr5 & tq_bs0_cs) | (ioctl_wr6 & ym_bs0_cs);
+wire dl_bs1    = (ioctl_wr0 & bs1_cs) | (ioctl_wr2 & sw_bs_cs[1]) | (ioctl_wr5 & tq_bs1_cs) | (ioctl_wr6 & ym_bs1_cs);
 wire dl_bs2    = ioctl_wr2 & sw_bs_cs[2];
 wire dl_smp    = ioctl_wr0 & smp_cs;
-wire dl_pal    = (ioctl_wr0 & pal_cs) | (ioctl_wr5 & tq_pal_cs);
+wire dl_pal    = (ioctl_wr0 & pal_cs) | (ioctl_wr5 & tq_pal_cs) | (ioctl_wr6 & ym_pal_rg_cs);
 wire dl_pal_lo = ioctl_wr2 & sw_pal_lo_cs;
 wire dl_pal_hi = ioctl_wr2 & sw_pal_hi_cs;
-wire dl_bspal  = (ioctl_wr0 & bspal_cs) | (ioctl_wr2 & sw_bspal_cs) | (ioctl_wr5 & tq_bspal_cs);
+wire dl_bspal  = (ioctl_wr0 & bspal_cs) | (ioctl_wr2 & sw_bspal_cs) | (ioctl_wr5 & tq_bspal_cs) | (ioctl_wr6 & ym_bspal_cs);
 wire dl_dprom  = ioctl_wr0 & dprom_cs;
 
 // Plane RAM addresses: tile slots are 8K on both indexes, big sprite planes 2K (index 0) / 4K (index 2)
 wire [12:0] dl_tile_addr = ioctl_addr[12:0];
-wire [11:0] dl_bs_addr   = (ioctl_wr2 | ioctl_wr5) ? ioctl_addr[11:0] : {1'b0, ioctl_addr[10:0]};
+wire [11:0] dl_bs_addr   = (ioctl_wr2 | ioctl_wr5 | ioctl_wr6) ? ioctl_addr[11:0] : {1'b0, ioctl_addr[10:0]};
 
 //------------------------------------------------------- Video timing --------------------------------------------------------//
 
@@ -231,7 +257,8 @@ wire       mem_wr   = ~cpu_mreq_n & ~cpu_wr_n;
 wire [4:0] a_hi     = cpu_addr[15:11];
 
 // CC: ROM 0000-5FFF, RAM 6000-6FFF.  Swimmer: ROM 0000-7FFF + E000-FFFF, RAM C000-CFFF (Guzzler)
-wire rom_cs   = swimmer ? (~cpu_addr[15] | (cpu_addr[15:13] == 3'b111)) : (cpu_addr < 16'h6000);
+wire rom_cs   = swimmer ? (~cpu_addr[15] | (cpu_addr[15:13] == 3'b111)) :
+                yamato  ? ((cpu_addr < 16'h6000) | (cpu_addr[15:12] == 4'h7)) : (cpu_addr < 16'h6000);
 wire ram6_cs  = cpu_addr[15:12] == (swimmer ? 4'hC : 4'h6);
 wire ram8_cs  = a_hi == 5'b10000;                                   // 8000-87FF
 wire bsram_cs = swimmer ? (a_hi == 5'b10001) : (cpu_addr[15:8] == 8'h88);
@@ -305,7 +332,17 @@ wire [7:0] dp_idx = {1'b0, cpu_addr[0], rom_src[7], rom_src[1], rom_src[4], rom_
 wire [3:0] dp     = dprom[dp_idx];
 wire [7:0] rom_dec = (rom_src & 8'hAA) | {1'b0, dp[2], 1'b0, dp[3], 1'b0, dp[1], 1'b0, dp[0]};
 
-wire [7:0] rom_data = (decrypt_en & ~cpu_m1_n) ? rom_dec : rom_src;
+// Sega 315-5018 (Yamato): opcode table on M1 fetches, data table on every other ROM read
+wire [7:0] rom_5018;
+sega_315_5018 dec_5018
+(
+    .src(rom_src),
+    .addr(cpu_addr),
+    .m1(~cpu_m1_n),
+    .dout(rom_5018)
+);
+
+wire [7:0] rom_data = yamato ? rom_5018 : (decrypt_en & ~cpu_m1_n) ? rom_dec : rom_src;
 
 //------------------------------------------------------- Work RAM ------------------------------------------------------------//
 
@@ -337,7 +374,7 @@ wire [7:0] bs_ram_do, tile_ram_do, color_ram_do;
 
 always_comb begin
     if (~cpu_iorq_n)
-        cpu_di = swimmer ? 8'hFF : ay_dout;
+        cpu_di = (swimmer | yamato) ? 8'hFF : ay_dout;
     else if (rom_cs)
         cpu_di = rom_data;
     else if (ram6_cs)
@@ -606,7 +643,7 @@ endfunction
 reg  [8:0] addr_ram_sprite = 9'd0;
 
 // Swimmer draws sprites one pixel left of CC (MAME x vs x+1, flipped 240-x vs 242-x)
-wire [8:0] sprite_x_load = {1'b0, x_sprite ^ {8{hinv}}} - {8'd0, swimmer};
+wire [8:0] sprite_x_load = {1'b0, x_sprite ^ {8{hinv}}} - {8'd0, swimmer | yamato};
 
 always_ff @(posedge clk) begin
     if (ce12) begin
@@ -673,8 +710,8 @@ always_comb begin
     endcase
 end
 
-// Ctrl bit 3 is tile code bit 8; only the 4K planes (Swimmer board, Tangram Q) are deep enough to use it
-wire [11:0] bs_rom_addr = {(swimmer | tangramq) & attr_big_sprite[3], bs_tile_code_r,
+// Ctrl bit 3 is tile code bit 8; only the 4K planes (Swimmer board, Tangram Q, Yamato) are deep enough to use it
+wire [11:0] bs_rom_addr = {(swimmer | tangramq | yamato) & attr_big_sprite[3], bs_tile_code_r,
                            attr_big_sprite[5] ? ~y_line_bs[2:0] : y_line_bs[2:0]};
 
 always_ff @(posedge clk) begin
@@ -798,6 +835,12 @@ always_ff @(posedge clk) begin
     if (dl_bspal)  bspal[ioctl_addr[4:0]]  <= ioctl_dout;
 end
 
+// Yamato: third/fourth PROMs carry the blue nibble of the 12-bit character pens
+reg [3:0] pal_b [64];
+always_ff @(posedge clk) if (dl_ym_pal_b) pal_b[ioctl_addr[5:0]] <= ioctl_dout[3:0];
+reg [3:0] do_pal_b = 4'd0;
+always_ff @(posedge clk) if (ce12) do_pal_b <= pal_b[pixel_color_r[5:0]];
+
 reg [7:0] do_palette = 8'd0, do_bs_palette = 8'd0;
 reg [3:0] do_pal_lo = 4'd0, do_pal_hi = 4'd0;
 reg [7:0] do_au_b = 8'd0, do_au_gr = 8'd0, do_aubs_b = 8'd0, do_aubs_gr = 8'd0;
@@ -852,16 +895,6 @@ function automatic [23:0] au_rgb(input [7:0] b, input [7:0] gr);
     au_rgb = {pal3(gr[2:0]), pal3(gr[6:4]), pal3(b[2:0])};
 endfunction
 
-wire [23:0] pf_rgb = au      ? au_rgb(do_au_b, do_au_gr) :
-                     swimmer ? {do_pal_lo[2:0], 5'd0, do_pal_hi[1:0], do_pal_lo[3], 5'd0, do_pal_hi[3:2], 6'd0}
-                             : cc_rgb(do_palette);
-wire [23:0] bs_rgb = au      ? au_rgb(do_aubs_b, do_aubs_gr) :
-                     swimmer ? sw_rgb(do_bs_palette) : cc_rgb(do_bs_palette);
-
-// Swimmer empty pixels: background register, or the fixed side panel colour right of column 24
-wire [23:0] bg_rgb   = {bgcolor[7:6], 6'd0, bgcolor[5:3], 5'd0, bgcolor[2:0], 5'd0};
-wire [23:0] side_rgb = 24'h209879;
-
 reg  [8:0] screen_x = 9'd0;
 reg        pf_clear_d = 1'b1;
 always_ff @(posedge clk) begin
@@ -869,12 +902,71 @@ always_ff @(posedge clk) begin
     if (ce_px) screen_x <= video_hblank ? 9'd0 : screen_x + 9'd1;
 end
 
+// Yamato character pens: 4-bit weights 0E/1F/43/8F; big sprite 3-bit 21/47/97 (MAME yamato_palette)
+function automatic [7:0] ym4(input [3:0] v);
+    ym4 = (v[0] ? 8'h0E : 8'h00) + (v[1] ? 8'h1F : 8'h00) + (v[2] ? 8'h43 : 8'h00) + (v[3] ? 8'h8F : 8'h00);
+endfunction
+
+function automatic [7:0] ym3(input [2:0] v);
+    ym3 = (v[0] ? 8'h21 : 8'h00) + (v[1] ? 8'h47 : 8'h00) + (v[2] ? 8'h97 : 8'h00);
+endfunction
+
+// Yamato gradient: 2 x 4K ROMs, bank {Q3,Q5,Q6}, bit 7 = flip, one entry per 2-pixel column (MAME screen_update_yamato)
+wire [7:0]  grad0_do, grad1_do;
+wire [7:0]  grad_x    = screen_x[7:0] + 8'd8;
+wire [6:0]  grad_i    = grad_x[7:1];
+// MAME: gradient[bank << 8 | flip << 7 | i] with a 3-bit bank, so only the low 2K of each 4K ROM is addressed
+wire [11:0] grad_addr = {1'b0, mainlatch[3], mainlatch[5], mainlatch[6], hinv, grad_i};
+
+dpram_dc #(.widthad_a(12)) grad0
+(
+    .clock_a(clk),
+    .address_a(ioctl_addr[11:0]),
+    .data_a(ioctl_dout),
+    .wren_a(dl_ym_grad0),
+
+    .clock_b(clk),
+    .address_b(grad_addr),
+    .q_b(grad0_do)
+);
+
+dpram_dc #(.widthad_a(12)) grad1
+(
+    .clock_a(clk),
+    .address_a(ioctl_addr[11:0]),
+    .data_a(ioctl_dout),
+    .wren_a(dl_ym_grad1),
+
+    .clock_b(clk),
+    .address_b(grad_addr),
+    .q_b(grad1_do)
+);
+
+wire [4:0]  grad_r5  = grad0_do[4:0];
+wire [4:0]  grad_g5  = {grad1_do[1:0], grad0_do[7:5]};
+wire [5:0]  grad_b6  = grad1_do[7:2];
+wire [23:0] grad_rgb = {grad_r5, grad_r5[4:2], grad_g5, grad_g5[4:2], grad_b6, grad_b6[5:4]};
+
+wire [23:0] pf_rgb = yamato  ? {ym4(do_palette[3:0]), ym4(do_palette[7:4]), ym4(do_pal_b)} :
+                     au      ? au_rgb(do_au_b, do_au_gr) :
+                     swimmer ? {do_pal_lo[2:0], 5'd0, do_pal_hi[1:0], do_pal_lo[3], 5'd0, do_pal_hi[3:2], 6'd0}
+                             : cc_rgb(do_palette);
+wire [23:0] bs_rgb = yamato  ? {ym3(do_bs_palette[2:0]), ym3(do_bs_palette[5:3]), ym3({do_bs_palette[7:6], 1'b0})} :
+                     au      ? au_rgb(do_aubs_b, do_aubs_gr) :
+                     swimmer ? sw_rgb(do_bs_palette) : cc_rgb(do_bs_palette);
+
+// Swimmer empty pixels: background register, or the fixed side panel colour right of column 24
+wire [23:0] bg_rgb   = {bgcolor[7:6], 6'd0, bgcolor[5:3], 5'd0, bgcolor[2:0], 5'd0};
+wire [23:0] side_rgb = 24'h209879;
+
 wire side_area = sidebg_en & (hinv ? (screen_x < 9'd64) : (screen_x >= 9'd192));
 
 reg [23:0] video_mux;
 always_comb begin
     if (is_big_sprite_on && !(bs_prio && sprite_on_r))
         video_mux = bs_rgb;
+    else if (yamato && pf_clear_d)
+        video_mux = grad_rgb;
     else if (swimmer && !au && pf_clear_d)
         video_mux = side_area ? side_rgb : bg_rgb;
     else
@@ -903,7 +995,7 @@ wire signed [15:0] cc_audio, sw_audio;
 cclimber_snd snd
 (
     .clk(clk),
-    .reset(reset | swimmer | tangramq),
+    .reset(reset | swimmer | tangramq | yamato),
 
     .ay_bdir(ay_bdir),
     .ay_bc1(ay_bc1),
@@ -966,6 +1058,29 @@ tangramq_snd snd_tq
     .audio(tq_audio)
 );
 
-assign audio = swimmer ? sw_audio : tangramq ? tq_audio : cc_audio;
+// Yamato: OUT $00 / $01 load the two polled sound latches
+wire signed [15:0] ym_audio;
+reg io_wr_d = 1'b0;
+always_ff @(posedge clk) io_wr_d <= io_wr;
+wire ym_out = yamato & io_wr & ~io_wr_d;          // start of the OUT: port address and data both valid
+
+yamato_snd snd_ym
+(
+    .clk(clk),
+    .reset(reset | ~yamato),
+    .pause(pause),
+
+    .latch1_we(ym_out & (cpu_addr[7:0] == 8'h00)),
+    .latch2_we(ym_out & (cpu_addr[7:0] == 8'h01)),
+    .latch_din(cpu_do),
+
+    .ioctl_addr(ioctl_addr),
+    .ioctl_dout(ioctl_dout),
+    .rom_wr(dl_ym_snd),
+
+    .audio(ym_audio)
+);
+
+assign audio = swimmer ? sw_audio : tangramq ? tq_audio : yamato ? ym_audio : cc_audio;
 
 endmodule

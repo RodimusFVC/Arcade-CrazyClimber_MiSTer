@@ -1,0 +1,68 @@
+<misterromdescription>
+    <name>Yamato (US)</name>
+    <region>US</region>
+    <homebrew>no</homebrew>
+    <bootleg>no</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Yamato</series>
+    <year>1983</year>
+    <manufacturer>Sega</manufacturer>
+    <category>Shooter</category>
+
+    <setname>yamatou</setname>
+    <parent>yamato</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (cw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>8-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>2</num_buttons>
+    <buttons names="Button 1,Button 2,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="80,00">
+        <dip name="Lives" bits="0,1" ids="3,4,5,6"/>
+        <dip name="Coin A" bits="2,4" ids="1C/1C,2C/1C,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play"/>
+        <dip name="Bonus Life" bits="5" ids="Every 30000,Every 50000"/>
+        <dip name="Speed" bits="6" ids="Slow,Fast"/>
+        <dip name="Cabinet" bits="7" ids="Cocktail,Upright"/>
+        <dip name="Coin B" bits="8,10" ids="1C/1C,2C/1C,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play"/>
+    </switches>
+
+    <!-- Index 6: CPU 0x0000, tiles 0x8000, big sprite 0xC000, sound CPU 0xE000, gradient 0x10000, palette PROMs 0x12000 -->
+    <rom index="6" md5="none" zip="yamatou.zip|yamato.zip">
+        <part crc="20895096" name="2.5de"/>
+        <part crc="57a696f9" name="3.5f"/>
+        <part crc="59a468e8" name="4.5jh"/>
+        <part repeat="0x1000">00</part>
+        <part crc="35987485" name="11.5a"/>
+        <part crc="161121f5" name="10.11k"/>
+        <part crc="56e84cc4" name="9.11h"/>
+        <part crc="28024d9a" name="8.11c"/>
+        <part crc="4a179790" name="7.11a"/>
+        <part crc="3aad9e3c" name="1.5v"/>
+        <part repeat="0x1800">00</part>
+        <part crc="7761ad24" name="5.5lm"/>
+        <part crc="da48444c" name="6.5n"/>
+        <part crc="ef2053ab" name="1.bpr"/>
+        <part crc="2281d39f" name="2.bpr"/>
+        <part crc="9e6341e3" name="3.bpr"/>
+        <part crc="1c97dc0b" name="4.bpr"/>
+        <part crc="edd6c05f" name="5.bpr"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>06 90 10</part>
+    </rom>
+
+    <remark>Yamato (US) (Sega)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

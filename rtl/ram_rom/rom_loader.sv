@@ -39,6 +39,18 @@
 //   0x0C000 - 0x0DFFF  sound CPU                "audiocpu"
 //   0x0E000 - 0x0E03F  tile/sprite palette PROMs
 //   0x0E040 - 0x0E05F  big sprite palette PROM
+//
+// ioctl index 6 (Yamato: CC board video, Sega 315-5018 CPU, gradient background, polled sound board):
+//   0x00000 - 0x07FFF  main CPU 0000-5FFF, 7000-7FFF   "maincpu"
+//   0x08000 - 0x09FFF  tile plane MSB                  "tile" first half
+//   0x0A000 - 0x0BFFF  tile plane LSB                  "tile" second half
+//   0x0C000 - 0x0CFFF  big sprite plane MSB            "bigsprite" first half
+//   0x0D000 - 0x0DFFF  big sprite plane LSB            "bigsprite" second half
+//   0x0E000 - 0x0E7FF  sound CPU                       "audiocpu"
+//   0x10000 - 0x11FFF  gradient ROMs (data0, data1)    "gradient"
+//   0x12000 - 0x1203F  palette PROMs 1+2: R/G nibbles  "proms" 0x00
+//   0x12040 - 0x1207F  palette PROMs 3+4: B nibble     "proms" 0x40
+//   0x12080 - 0x1209F  big sprite palette PROM 5       "proms" 0x80
 
 module selector
 (
@@ -122,5 +134,38 @@ module selector_tangramq
         else if (ioctl_addr < 25'h0E000) snd_cs   = 1'b1;
         else if (ioctl_addr < 25'h0E040) pal_cs   = 1'b1;
         else if (ioctl_addr < 25'h0E060) bspal_cs = 1'b1;
+    end
+endmodule
+
+module selector_yamato
+(
+    input  logic [24:0] ioctl_addr,
+    output logic        prog_cs,
+    output logic        tile0_cs,
+    output logic        tile1_cs,
+    output logic        bs0_cs,
+    output logic        bs1_cs,
+    output logic        snd_cs,
+    output logic        grad0_cs,
+    output logic        grad1_cs,
+    output logic        pal_rg_cs,
+    output logic        pal_b_cs,
+    output logic        bspal_cs
+);
+    always_comb begin
+        {prog_cs, tile0_cs, tile1_cs, bs0_cs, bs1_cs, snd_cs, grad0_cs, grad1_cs, pal_rg_cs, pal_b_cs, bspal_cs} = '0;
+
+        if      (ioctl_addr < 25'h08000) prog_cs   = 1'b1;
+        else if (ioctl_addr < 25'h0A000) tile0_cs  = 1'b1;
+        else if (ioctl_addr < 25'h0C000) tile1_cs  = 1'b1;
+        else if (ioctl_addr < 25'h0D000) bs0_cs    = 1'b1;
+        else if (ioctl_addr < 25'h0E000) bs1_cs    = 1'b1;
+        else if (ioctl_addr < 25'h0E800) snd_cs    = 1'b1;
+        else if (ioctl_addr < 25'h10000) ;
+        else if (ioctl_addr < 25'h11000) grad0_cs  = 1'b1;
+        else if (ioctl_addr < 25'h12000) grad1_cs  = 1'b1;
+        else if (ioctl_addr < 25'h12040) pal_rg_cs = 1'b1;
+        else if (ioctl_addr < 25'h12080) pal_b_cs  = 1'b1;
+        else if (ioctl_addr < 25'h120A0) bspal_cs  = 1'b1;
     end
 endmodule

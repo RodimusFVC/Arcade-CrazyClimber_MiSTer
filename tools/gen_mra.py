@@ -39,11 +39,16 @@ def variant_for(g):
         return 0x02 | (0x04 if g["init"] == "init_cannonb" else 0)
     if g["machine"] == "tangramq":
         return 0x08
+    if g["machine"] == "yamato":
+        return 0x10
     return None
 
 
 # Tangram Q loads through ioctl index 5 (indexes 3/4 are reserved for hiscore config / NVRAM)
 TANGRAMQ_REGIONS = {"maincpu": 0x00000, "tile": 0x06000, "bigsprite": 0x0A000, "audiocpu": 0x0C000, "proms": 0x0E000}
+# Yamato loads through ioctl index 6
+YAMATO_REGIONS = {"maincpu": 0x00000, "tile": 0x08000, "bigsprite": 0x0C000, "audiocpu": 0x0E000,
+                  "gradient": 0x10000, "proms": 0x12000}
 
 
 def rom_index_for(g):
@@ -51,6 +56,8 @@ def rom_index_for(g):
         return 2
     if g["machine"] == "tangramq":
         return 5
+    if g["machine"] == "yamato":
+        return 6
     return 0
 IGNORED_REGIONS = {"cpu_pal", "unused"}            # guzzlers' PAL16L8 dump, cannonb's stray ROMs
 
@@ -75,12 +82,13 @@ def swimmer_region(region, dst, rsize):
     return None
 
 
-LAYOUT_CC, LAYOUT_CKONG, LAYOUT_RPATROL, LAYOUT_SWIMMER, LAYOUT_CANNONB, LAYOUT_TANGRAMQ = 0, 1, 2, 3, 4, 5
+LAYOUT_CC, LAYOUT_CKONG, LAYOUT_RPATROL, LAYOUT_SWIMMER, LAYOUT_CANNONB, LAYOUT_TANGRAMQ, LAYOUT_YAMATO = 0, 1, 2, 3, 4, 5, 6
 
 F_DECRYPT, F_VOL5, F_VERT, F_NMIQ3, F_SWIMMER, F_ROT90 = 0x01, 0x08, 0x10, 0x20, 0x40, 0x80
 XOR = {"init_rpatrol": 1 << 1, "init_ckongb": 2 << 1, "init_dking": 3 << 1}
 
 BUTTONS = {
+    LAYOUT_YAMATO: ("Button 1,Button 2,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 2, "8-way", ""),
     LAYOUT_TANGRAMQ: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "2-way horizontal", ""),
     LAYOUT_CANNONB: ("Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
     LAYOUT_SWIMMER: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "8-way", ""),
@@ -106,7 +114,15 @@ SW_COIN = [('Coin A', "4,5", "1C/1C,2C/1C,1C/2C,1C/3C"),
            ('Coin B', "6,7", "1C/1C,1C/2C,1C/3C,1C/6C"),
            ('Cabinet', "12", "Cocktail,Upright")]
 
+YM_DSW1 = [('Lives', "0,1", "3,4,5,6"),
+           ('Coin A', "2,4", "1C/1C,2C/1C,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play"),
+           ('Bonus Life', "5", "Every 30000,Every 50000"),
+           ('Speed', "6", "Slow,Fast"),
+           ('Cabinet', "7", "Cocktail,Upright")]
+
 DIPS = {
+    "yamato":   ("80,00", YM_DSW1),
+    "yamatou":  ("80,00", YM_DSW1 + [('Coin B', "8,10", "1C/1C,2C/1C,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play")]),
     "tangramq": ("8E,FF", [('Lives', "0,1", "1,2,3,5"),
                            ('Freeze', "2", "On,Off"),
                            ('Demo Sounds', "3", "Off,On"),
@@ -155,9 +171,9 @@ REGION_WORDS = [("US", "US"), ("Japan", "Japan"), ("Spanish", "Spain")]
 
 JOYSTICK_BY_INPUT = {"guzzler": "4-way"}
 
-SERIES_BY_PARENT = {"tangramq": ("Tangram Q", "Puzzle"), "cannonbp": ("Cannon Ball", "Shooter"), "swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze"), "au": ("Au", "Action")}
+SERIES_BY_PARENT = {"yamato": ("Yamato", "Shooter"), "tangramq": ("Tangram Q", "Puzzle"), "cannonbp": ("Cannon Ball", "Shooter"), "swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze"), "au": ("Au", "Action")}
 
-LAYOUT_BY_INPUT = {"tangramq": LAYOUT_TANGRAMQ, "cannonb": LAYOUT_CANNONB, "au": LAYOUT_SWIMMER, "swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
+LAYOUT_BY_INPUT = {"yamato": LAYOUT_YAMATO, "yamatou": LAYOUT_YAMATO, "tangramq": LAYOUT_TANGRAMQ, "cannonb": LAYOUT_CANNONB, "au": LAYOUT_SWIMMER, "swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
                    "cclimber": LAYOUT_CC, "cclimberj": LAYOUT_CC,
                    "ckong": LAYOUT_CKONG, "ckongb": LAYOUT_CKONG, "ckongb2": LAYOUT_CKONG,
                    "rpatrol": LAYOUT_RPATROL}
@@ -202,15 +218,16 @@ def parse_roms(src, setname):
     return segs
 
 
-def place(segs, setname, swimmer=False, tangramq=False):
+def place(segs, setname, swimmer=False, tangramq=False, yamato=False):
     out = []
     for s in segs:
         if s["region"] in IGNORED_REGIONS:
             continue
-        if tangramq:
-            if s["region"] not in TANGRAMQ_REGIONS:
+        if tangramq or yamato:
+            table = TANGRAMQ_REGIONS if tangramq else YAMATO_REGIONS
+            if s["region"] not in table:
                 raise SystemExit(f"{setname}: unmapped region {s['region']}")
-            out.append(dict(s, addr=TANGRAMQ_REGIONS[s["region"]] + s["dst"]))
+            out.append(dict(s, addr=table[s["region"]] + s["dst"]))
             continue
         if swimmer:
             hit = swimmer_region(s["region"], s["dst"], s["rsize"])
@@ -275,7 +292,10 @@ def mra(g, games, segs):
     rom_index = rom_index_for(g)
     v = variant_for(g)
     variant = f" {v:02X}" if v is not None else ""
-    if rom_index == 5:
+    if rom_index == 6:
+        index0 = ("CPU 0x0000, tiles 0x8000, big sprite 0xC000, sound CPU 0xE000, gradient 0x10000, "
+                  "palette PROMs 0x12000")
+    elif rom_index == 5:
         index0 = "CPU 0x0000, tiles 0x6000, big sprite 0xA000, sound CPU 0xC000, palette PROMs 0xE000"
     elif rom_index == 2:
         index0 = ("CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tile planes 0xC000 (8K slots), "
@@ -393,7 +413,8 @@ def main():
     games = parse_games(src)
     for name in sys.argv[3:]:
         g = games[name]
-        segs = place(parse_roms(src, name), name, g["machine"] in SWIMMER_MACHINES, g["machine"] == "tangramq")
+        segs = place(parse_roms(src, name), name, g["machine"] in SWIMMER_MACHINES, g["machine"] == "tangramq",
+                     g["machine"] == "yamato")
         path = out_path(out_dir, g, games)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(mra(g, games, segs))

@@ -8,6 +8,8 @@ set_global_assignment -name QIP_FILE rtl/cpu/T80/T80.qip
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/cclimber_snd.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/swimmer_snd.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/tangramq_snd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/yamato_snd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/segacrypt/sega_315_5018.sv
 set_global_assignment -name QIP_FILE rtl/sound/v_sound.qip
 
 set_global_assignment -name VERILOG_FILE rtl/mister_custom/pause.v

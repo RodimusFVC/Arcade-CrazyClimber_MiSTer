@@ -77,13 +77,13 @@ assign BUTTONS = 0;
 ///////////////////////////////////////////////////
 
 // MRA index 1: byte 0 = control layout, byte 1 = board flags
-//   layout: 0 Crazy Climber twin stick, 1 Crazy Kong, 2 River Patrol, 3 Swimmer / Guzzler, 4 Cannon Ball, 5 Tangram Q
-// ROM images: index 0 CC board, 2 Swimmer board, 5 Tangram Q; 3 and 4 are reserved for hiscore config / NVRAM
+//   layout: 0 Crazy Climber twin stick, 1 Crazy Kong, 2 River Patrol, 3 Swimmer / Guzzler, 4 Cannon Ball, 5 Tangram Q, 6 Yamato
+// ROM images: index 0 CC board, 2 Swimmer board, 5 Tangram Q, 6 Yamato; 3 and 4 are reserved for hiscore config / NVRAM
 //   flags : [0] decryption PROM, [2:1] ROM XOR mode, [3] volume D4 fitted, [4] vertical (ROT270),
 //           [5] latch Q3 drives the NMI mask, [6] Swimmer board (ROMs on index 2), [7] vertical is ROT90
 reg [7:0] game_layout = 8'd0;
 reg [7:0] game_flags  = 8'd1;
-reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au, [1] Cannon Ball board, [2] Cannon Ball ROM XOR, [3] Tangram Q
+reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au, [1] Cannon Ball board, [2] Cannon Ball ROM XOR, [3] Tangram Q, [4] Yamato
 
 always @(posedge CLK_49M) begin
 	if (ioctl_wr && ioctl_index == 8'd1) begin
@@ -299,6 +299,11 @@ always @(*) begin
 	in_sys1 = 8'hFF;
 	in_sys2 = 8'hFF;
 	case (game_layout)
+		8'd6: begin // Yamato: 8-way + 2 buttons; the US set reads its Coin B switches (DSW2) through P1/P2 bits 0-1
+			in_p1  = {m_right1, m_left1, m_down1, m_up1, m_b2_1, m_b1_1, dip_sw[1][1:0]};
+			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b2_2, m_b1_2, dip_sw[1][3:2]};
+			in_sys = {4'b0000, m_start2, m_start1, m_coin1, m_coin2};
+		end
 		8'd5: begin // Tangram Q: 2-way + button; B000 = DSW2, B800 = DSW1; coins/starts on 8000/8020 (active low)
 			in_p1   = {4'b0000, m_left1, m_right1, m_b1_1, 1'b0};
 			in_p2   = {4'b0000, m_left2, m_right2, m_b1_2, 1'b0};
@@ -391,6 +396,7 @@ cclimber_board board
 	.cannonb(game_var[1]),
 	.cb_xor(game_var[2]),
 	.tangramq(game_var[3]),
+	.yamato(game_var[4]),
 	.decrypt_en(game_flags[0]),
 	.rom_xor(game_flags[2:1]),
 	.vol5_en(game_flags[3]),
@@ -408,6 +414,7 @@ cclimber_board board
 	.ioctl_wr0(ioctl_wr & (ioctl_index == 8'd0)),
 	.ioctl_wr2(ioctl_wr & (ioctl_index == 8'd2)),
 	.ioctl_wr5(ioctl_wr & (ioctl_index == 8'd5)),
+	.ioctl_wr6(ioctl_wr & (ioctl_index == 8'd6)),
 
 	.video_r(r),
 	.video_g(g),
