@@ -27,6 +27,18 @@
 //   0x15000 - 0x150FF  palette PROM low nibble  "proms" 0x000 (not on Au: palette RAM)
 //   0x15100 - 0x151FF  palette PROM high nibble "proms" 0x100
 //   0x15200 - 0x1521F  big sprite palette PROM  "proms" 0x200
+//
+// ioctl indexes 3 and 4 are reserved for hiscore config and NVRAM
+//
+// ioctl index 5 (Tangram Q: CC board video, 4K big sprite planes, SNK sound board), images as dumped:
+//   0x00000 - 0x05FFF  main CPU                 "maincpu"
+//   0x06000 - 0x07FFF  tile plane MSB           "tile" first half
+//   0x08000 - 0x09FFF  tile plane LSB           "tile" second half
+//   0x0A000 - 0x0AFFF  big sprite plane MSB     "bigsprite" first half
+//   0x0B000 - 0x0BFFF  big sprite plane LSB     "bigsprite" second half
+//   0x0C000 - 0x0DFFF  sound CPU                "audiocpu"
+//   0x0E000 - 0x0E03F  tile/sprite palette PROMs
+//   0x0E040 - 0x0E05F  big sprite palette PROM
 
 module selector
 (
@@ -84,5 +96,31 @@ module selector_swimmer
         else if (ioctl_addr < 25'h15100) pal_lo_cs = 1'b1;
         else if (ioctl_addr < 25'h15200) pal_hi_cs = 1'b1;
         else if (ioctl_addr < 25'h15220) bspal_cs  = 1'b1;
+    end
+endmodule
+
+module selector_tangramq
+(
+    input  logic [24:0] ioctl_addr,
+    output logic        prog_cs,
+    output logic        tile0_cs,
+    output logic        tile1_cs,
+    output logic        bs0_cs,
+    output logic        bs1_cs,
+    output logic        snd_cs,
+    output logic        pal_cs,
+    output logic        bspal_cs
+);
+    always_comb begin
+        {prog_cs, tile0_cs, tile1_cs, bs0_cs, bs1_cs, snd_cs, pal_cs, bspal_cs} = '0;
+
+        if      (ioctl_addr < 25'h06000) prog_cs  = 1'b1;
+        else if (ioctl_addr < 25'h08000) tile0_cs = 1'b1;
+        else if (ioctl_addr < 25'h0A000) tile1_cs = 1'b1;
+        else if (ioctl_addr < 25'h0B000) bs0_cs   = 1'b1;
+        else if (ioctl_addr < 25'h0C000) bs1_cs   = 1'b1;
+        else if (ioctl_addr < 25'h0E000) snd_cs   = 1'b1;
+        else if (ioctl_addr < 25'h0E040) pal_cs   = 1'b1;
+        else if (ioctl_addr < 25'h0E060) bspal_cs = 1'b1;
     end
 endmodule

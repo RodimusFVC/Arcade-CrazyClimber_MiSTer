@@ -20,6 +20,9 @@ module cclimber_board
 
     input               swimmer,        // Swimmer board (3bpp, sound CPU)
     input               au,             // Au: Swimmer board with 8K planes and palette RAM
+    input               cannonb,        // Cannon Ball: CK board, chars/sprites split per plane, one flip bit
+    input               cb_xor,         // Cannon Ball set 1: first program ROM XORed by address
+    input               tangramq,       // Tangram Q: SYSTEM ports at 8000/8020, SNK sound board, 4K big sprite planes
     input               decrypt_en,     // dm7052 opcode decryption PROM fitted
     input         [1:0] rom_xor,        // 0 none, 1 rpatrol, 2 ckongb, 3 dking
     input               vol5_en,        // volume D4 resistor fitted
@@ -29,11 +32,14 @@ module cclimber_board
     input         [7:0] in_p2,          // $A800
     input         [7:0] in_dsw,         // $B000
     input         [7:0] in_sys,         // $B800
+    input         [7:0] in_sys1,        // $8000 (Tangram Q)
+    input         [7:0] in_sys2,        // $8020 (Tangram Q)
 
     input        [24:0] ioctl_addr,
     input         [7:0] ioctl_dout,
     input               ioctl_wr0,      // ioctl index 0 (Crazy Climber layout)
     input               ioctl_wr2,      // ioctl index 2 (Swimmer layout)
+    input               ioctl_wr5,      // ioctl index 5 (Tangram Q layout)
 
     output        [7:0] video_r,
     output        [7:0] video_g,
@@ -87,25 +93,42 @@ selector_swimmer rom_sel_sw
     .bspal_cs(sw_bspal_cs)
 );
 
-wire dl_prog   = (ioctl_wr0 & prog_cs) | (ioctl_wr2 & sw_prog_cs);
+wire tq_prog_cs, tq_tile0_cs, tq_tile1_cs, tq_bs0_cs, tq_bs1_cs, tq_snd_cs, tq_pal_cs, tq_bspal_cs;
+
+selector_tangramq rom_sel_tq
+(
+    .ioctl_addr(ioctl_addr),
+    .prog_cs(tq_prog_cs),
+    .tile0_cs(tq_tile0_cs),
+    .tile1_cs(tq_tile1_cs),
+    .bs0_cs(tq_bs0_cs),
+    .bs1_cs(tq_bs1_cs),
+    .snd_cs(tq_snd_cs),
+    .pal_cs(tq_pal_cs),
+    .bspal_cs(tq_bspal_cs)
+);
+
+wire dl_tq_snd = ioctl_wr5 & tq_snd_cs;
+
+wire dl_prog   = (ioctl_wr0 & prog_cs) | (ioctl_wr2 & sw_prog_cs) | (ioctl_wr5 & tq_prog_cs);
 wire dl_himem  = ioctl_wr2 & sw_himem_cs;
 wire dl_snd    = ioctl_wr2 & sw_snd_cs;
-wire dl_tile0  = (ioctl_wr0 & tile0_cs) | (ioctl_wr2 & sw_tile_cs[0]);
-wire dl_tile1  = (ioctl_wr0 & tile1_cs) | (ioctl_wr2 & sw_tile_cs[1]);
+wire dl_tile0  = (ioctl_wr0 & tile0_cs) | (ioctl_wr2 & sw_tile_cs[0]) | (ioctl_wr5 & tq_tile0_cs);
+wire dl_tile1  = (ioctl_wr0 & tile1_cs) | (ioctl_wr2 & sw_tile_cs[1]) | (ioctl_wr5 & tq_tile1_cs);
 wire dl_tile2  = ioctl_wr2 & sw_tile_cs[2];
-wire dl_bs0    = (ioctl_wr0 & bs0_cs) | (ioctl_wr2 & sw_bs_cs[0]);
-wire dl_bs1    = (ioctl_wr0 & bs1_cs) | (ioctl_wr2 & sw_bs_cs[1]);
+wire dl_bs0    = (ioctl_wr0 & bs0_cs) | (ioctl_wr2 & sw_bs_cs[0]) | (ioctl_wr5 & tq_bs0_cs);
+wire dl_bs1    = (ioctl_wr0 & bs1_cs) | (ioctl_wr2 & sw_bs_cs[1]) | (ioctl_wr5 & tq_bs1_cs);
 wire dl_bs2    = ioctl_wr2 & sw_bs_cs[2];
 wire dl_smp    = ioctl_wr0 & smp_cs;
-wire dl_pal    = ioctl_wr0 & pal_cs;
+wire dl_pal    = (ioctl_wr0 & pal_cs) | (ioctl_wr5 & tq_pal_cs);
 wire dl_pal_lo = ioctl_wr2 & sw_pal_lo_cs;
 wire dl_pal_hi = ioctl_wr2 & sw_pal_hi_cs;
-wire dl_bspal  = (ioctl_wr0 & bspal_cs) | (ioctl_wr2 & sw_bspal_cs);
+wire dl_bspal  = (ioctl_wr0 & bspal_cs) | (ioctl_wr2 & sw_bspal_cs) | (ioctl_wr5 & tq_bspal_cs);
 wire dl_dprom  = ioctl_wr0 & dprom_cs;
 
 // Plane RAM addresses: tile slots are 8K on both indexes, big sprite planes 2K (index 0) / 4K (index 2)
 wire [12:0] dl_tile_addr = ioctl_addr[12:0];
-wire [11:0] dl_bs_addr   = ioctl_wr2 ? ioctl_addr[11:0] : {1'b0, ioctl_addr[10:0]};
+wire [11:0] dl_bs_addr   = (ioctl_wr2 | ioctl_wr5) ? ioctl_addr[11:0] : {1'b0, ioctl_addr[10:0]};
 
 //------------------------------------------------------- Video timing --------------------------------------------------------//
 
@@ -163,7 +186,7 @@ wire [4:0] x_tile_v  = x_tile ^ {5{hinv}};
 // Q0 NMI enable, Q1 flip X, Q2 flip Y; Q4 sample trigger (CC) / Q3 side background, Q4 palette bank (Swimmer)
 reg [7:0] mainlatch = 8'h00;
 assign flip_x = mainlatch[1];
-assign flip_y = mainlatch[2];
+assign flip_y = cannonb ? mainlatch[1] : mainlatch[2];
 wire   sidebg_en  = swimmer & ~au & mainlatch[3];
 wire   pal_bank   = swimmer & ~au & mainlatch[4];
 
@@ -262,6 +285,14 @@ always_comb begin
                   rom_xor_mask = 8'hFF;
         default: ;
     endcase
+    // MAME init_cannonb: only 0000-0FFF, key picked by A9/A7
+    if (cb_xor && cpu_addr < 16'h1000)
+        case ({cpu_addr[9], cpu_addr[7]})
+            2'd0: rom_xor_mask = 8'h92;
+            2'd1: rom_xor_mask = 8'h82;
+            2'd2: rom_xor_mask = 8'h12;
+            2'd3: rom_xor_mask = 8'h10;
+        endcase
 end
 
 wire [7:0] rom_src = rom_do ^ rom_xor_mask;
@@ -296,7 +327,7 @@ spram #(.DATA_WIDTH(8), .ADDR_WIDTH(11)) ram8
     .addr({swimmer & cpu_addr[10], cpu_addr[9:0]}),
     .data(cpu_do),
     .q(ram8_do),
-    .we(mem_wr & ram8_cs)
+    .we(mem_wr & ram8_cs & ~tangramq)
 );
 
 //------------------------------------------------------- CPU read mux --------------------------------------------------------//
@@ -312,8 +343,8 @@ always_comb begin
     else if (ram6_cs)
         cpu_di = ram6_do;
     else case (a_hi)
-        5'b10000: cpu_di = ram8_do;
-        5'b10001: cpu_di = bs_ram_do;
+        5'b10000: cpu_di = tangramq ? (cpu_addr[5] ? in_sys2 : in_sys1) : ram8_do;
+        5'b10001: cpu_di = cannonb ? 8'h00 : bs_ram_do;   // Cannon Ball big sprite RAM is write-only
         5'b10010: cpu_di = tile_ram_do;
         5'b10011: cpu_di = color_ram_do;
         5'b10100: cpu_di = in_p1;
@@ -484,9 +515,11 @@ always_comb begin
     endcase
 end
 
-// Code bank bits: CC {attr4, attr5}; Swimmer attr4 only (4K planes, 512 chars / 128 sprites); Au {attr5, attr4}
+// Code bank bits: CC {attr4, attr5}; Swimmer attr4 only (4K planes, 512 chars / 128 sprites); Au {attr5, attr4};
+// Cannon Ball: chars in the first 4K of each plane (attr5 = code bit 8), 64 sprites in the second 4K
 wire [1:0] code_hi = au      ? {attr_sp_bg[5], attr_sp_bg[4]} :
-                     swimmer ? {1'b0, attr_sp_bg[4]} : {attr_sp_bg[4], attr_sp_bg[5]};
+                     swimmer ? {1'b0, attr_sp_bg[4]} :
+                     cannonb ? (is_sprite ? 2'b10 : {1'b0, attr_sp_bg[5]}) : {attr_sp_bg[4], attr_sp_bg[5]};
 
 always_ff @(posedge clk) begin
     if (ce12) begin
@@ -640,8 +673,8 @@ always_comb begin
     endcase
 end
 
-// Ctrl bit 3 is tile code bit 8; only the 4K Swimmer planes are deep enough to use it
-wire [11:0] bs_rom_addr = {swimmer & attr_big_sprite[3], bs_tile_code_r,
+// Ctrl bit 3 is tile code bit 8; only the 4K planes (Swimmer board, Tangram Q) are deep enough to use it
+wire [11:0] bs_rom_addr = {(swimmer | tangramq) & attr_big_sprite[3], bs_tile_code_r,
                            attr_big_sprite[5] ? ~y_line_bs[2:0] : y_line_bs[2:0]};
 
 always_ff @(posedge clk) begin
@@ -870,7 +903,7 @@ wire signed [15:0] cc_audio, sw_audio;
 cclimber_snd snd
 (
     .clk(clk),
-    .reset(reset | swimmer),
+    .reset(reset | swimmer | tangramq),
 
     .ay_bdir(ay_bdir),
     .ay_bc1(ay_bc1),
@@ -912,6 +945,27 @@ swimmer_snd snd_sw
     .audio(sw_audio)
 );
 
-assign audio = swimmer ? sw_audio : cc_audio;
+// Tangram Q: B000 write = sound latch, clocked at the end of the write like /WRS
+wire signed [15:0] tq_audio;
+reg b000_we_d = 1'b0;
+always_ff @(posedge clk) b000_we_d <= b000_we;
+
+tangramq_snd snd_tq
+(
+    .clk(clk),
+    .reset(reset | ~tangramq),
+    .pause(pause),
+
+    .latch_we(tangramq & b000_we_d & ~b000_we),
+    .latch_din(cpu_do),
+
+    .ioctl_addr(ioctl_addr),
+    .ioctl_dout(ioctl_dout),
+    .rom_wr(dl_tq_snd),
+
+    .audio(tq_audio)
+);
+
+assign audio = swimmer ? sw_audio : tangramq ? tq_audio : cc_audio;
 
 endmodule

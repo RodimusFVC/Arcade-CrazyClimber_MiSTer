@@ -1,0 +1,67 @@
+<misterromdescription>
+    <name>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 3, No Bonus Game)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Cannon Ball</series>
+    <year>1985</year>
+    <manufacturer>bootleg (Soft)</manufacturer>
+    <category>Shooter</category>
+
+    <setname>cannonb3</setname>
+    <parent>cannonbp</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (cw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>4-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="E7">
+        <dip name="Display" bits="0,1" ids="None,Scores Only,Progress Bars Only,Scores and Progress Bars"/>
+        <dip name="Cabinet" bits="2" ids="Cocktail,Upright"/>
+        <dip name="Lives" bits="3,4" ids="3,4,5,6"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="cannonb3.zip|cannonbp.zip">
+        <part crc="4b482e80" name="1 pos e5  2532.bin"/>
+        <part crc="1fa050af" name="2 pos f5  2532.bin"/>
+        <part crc="e18a836b" name="3 pos h5  2532.bin"/>
+        <part crc="58e04f41" name="4 pos k5  2716.bin"/>
+        <part repeat="0x2800">00</part>
+        <part crc="602a6c2d" name="b pos n11  2532.bin" offset="0x0" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="602a6c2d" name="b pos n11  2532.bin" offset="0x800" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="2d036026" name="a pos k11  2532.bin" offset="0x0" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="2d036026" name="a pos k11  2532.bin" offset="0x800" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="d1352c31" name="ck2 pos c11  2716.bin"/>
+        <part crc="a7a2fdbd" name="ck1 pos a11  2716.bin"/>
+        <part crc="5f0bcdfb" name="ck14 pos s5  2532.bin"/>
+        <part crc="9003ffbd" name="ck13 pos r5  2532.bin"/>
+        <part crc="b3fc1505" name="c pos v6  n82s123n.bin"/>
+        <part crc="a758b567" name="b pos u6  n82s123n.bin"/>
+        <part crc="676b3166" name="a pos t6  n82s123n.bin"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>04 98 02</part>
+    </rom>
+
+    <remark>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 3, No Bonus Game) (Soft Bootleg)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

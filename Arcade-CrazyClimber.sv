@@ -77,12 +77,13 @@ assign BUTTONS = 0;
 ///////////////////////////////////////////////////
 
 // MRA index 1: byte 0 = control layout, byte 1 = board flags
-//   layout: 0 Crazy Climber twin stick, 1 Crazy Kong, 2 River Patrol, 3 Swimmer / Guzzler
+//   layout: 0 Crazy Climber twin stick, 1 Crazy Kong, 2 River Patrol, 3 Swimmer / Guzzler, 4 Cannon Ball, 5 Tangram Q
+// ROM images: index 0 CC board, 2 Swimmer board, 5 Tangram Q; 3 and 4 are reserved for hiscore config / NVRAM
 //   flags : [0] decryption PROM, [2:1] ROM XOR mode, [3] volume D4 fitted, [4] vertical (ROT270),
 //           [5] latch Q3 drives the NMI mask, [6] Swimmer board (ROMs on index 2), [7] vertical is ROT90
 reg [7:0] game_layout = 8'd0;
 reg [7:0] game_flags  = 8'd1;
-reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au
+reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au, [1] Cannon Ball board, [2] Cannon Ball ROM XOR, [3] Tangram Q
 
 always @(posedge CLK_49M) begin
 	if (ioctl_wr && ioctl_index == 8'd1) begin
@@ -292,10 +293,20 @@ wire coin1_imp = |coin1_frames;
 wire coin2_imp = |coin2_frames;
 
 // Per-game port layout and polarity (MAME INPUT_PORTS)
-reg [7:0] in_p1, in_p2, in_dsw, in_sys;
+reg [7:0] in_p1, in_p2, in_dsw, in_sys, in_sys1, in_sys2;
 always @(*) begin
-	in_dsw = dip_sw[0];
+	in_dsw  = dip_sw[0];
+	in_sys1 = 8'hFF;
+	in_sys2 = 8'hFF;
 	case (game_layout)
+		8'd5: begin // Tangram Q: 2-way + button; B000 = DSW2, B800 = DSW1; coins/starts on 8000/8020 (active low)
+			in_p1   = {4'b0000, m_left1, m_right1, m_b1_1, 1'b0};
+			in_p2   = {4'b0000, m_left2, m_right2, m_b1_2, 1'b0};
+			in_dsw  = dip_sw[1];
+			in_sys  = dip_sw[0];
+			in_sys1 = {2'b11, ~m_coin1, 2'b11, ~m_start1, ~m_start2, 1'b1};
+			in_sys2 = {4'hF, ~m_coin2, 3'b111};
+		end
 		8'd1: begin // Crazy Kong: 4-way + jump, SYSTEM active low
 			in_p1  = {m_right1, m_left1, m_down1, m_up1, m_b1_1, 3'b000};
 			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b1_2, 3'b000};
@@ -305,6 +316,11 @@ always @(*) begin
 			in_p1  = {3'b000, m_b1_2, m_down2, m_up2, m_left2, m_right2};
 			in_p2  = {3'b000, m_b1_1, m_down1, m_up1, m_left1, m_right1};
 			in_sys = {dip_sw[1][7:4], m_start2, m_start1, coin2_imp, coin1_imp};
+		end
+		8'd4: begin // Cannon Ball: Crazy Kong ports with P1 right/left swapped
+			in_p1  = {m_left1, m_right1, m_down1, m_up1, m_b1_1, 3'b000};
+			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b1_2, 3'b000};
+			in_sys = {4'hF, ~m_start2, ~m_start1, ~m_coin2, ~m_coin1};
 		end
 		8'd2: begin // River Patrol: P1 port carries the cocktail player
 			in_p1  = {m_right2, m_left2, 5'b00000, m_b1_2};
@@ -372,6 +388,9 @@ cclimber_board board
 
 	.swimmer(game_flags[6]),
 	.au(game_var[0]),
+	.cannonb(game_var[1]),
+	.cb_xor(game_var[2]),
+	.tangramq(game_var[3]),
 	.decrypt_en(game_flags[0]),
 	.rom_xor(game_flags[2:1]),
 	.vol5_en(game_flags[3]),
@@ -381,11 +400,14 @@ cclimber_board board
 	.in_p2(in_p2),
 	.in_dsw(in_dsw),
 	.in_sys(in_sys),
+	.in_sys1(in_sys1),
+	.in_sys2(in_sys2),
 
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 	.ioctl_wr0(ioctl_wr & (ioctl_index == 8'd0)),
 	.ioctl_wr2(ioctl_wr & (ioctl_index == 8'd2)),
+	.ioctl_wr5(ioctl_wr & (ioctl_index == 8'd5)),
 
 	.video_r(r),
 	.video_g(g),

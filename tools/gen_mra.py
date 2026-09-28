@@ -31,8 +31,28 @@ REGIONS = {
 
 # Swimmer board (machine swimmer/guzzler) loads through ioctl index 2 with its own map
 SWIMMER_MACHINES = {"swimmer", "guzzler", "au"}
-VARIANT = {"au": 0x01}                             # index 1 byte 2: board variant
-IGNORED_REGIONS = {"cpu_pal"}                      # guzzlers' PAL16L8 dump, not used by the core
+def variant_for(g):
+    """Index 1 byte 2: [0] Au, [1] Cannon Ball board, [2] Cannon Ball first-ROM XOR (init_cannonb)."""
+    if g["machine"] == "au":
+        return 0x01
+    if g["machine"] == "cannonb":
+        return 0x02 | (0x04 if g["init"] == "init_cannonb" else 0)
+    if g["machine"] == "tangramq":
+        return 0x08
+    return None
+
+
+# Tangram Q loads through ioctl index 5 (indexes 3/4 are reserved for hiscore config / NVRAM)
+TANGRAMQ_REGIONS = {"maincpu": 0x00000, "tile": 0x06000, "bigsprite": 0x0A000, "audiocpu": 0x0C000, "proms": 0x0E000}
+
+
+def rom_index_for(g):
+    if g["machine"] in SWIMMER_MACHINES:
+        return 2
+    if g["machine"] == "tangramq":
+        return 5
+    return 0
+IGNORED_REGIONS = {"cpu_pal", "unused"}            # guzzlers' PAL16L8 dump, cannonb's stray ROMs
 
 
 def swimmer_region(region, dst, rsize):
@@ -55,12 +75,14 @@ def swimmer_region(region, dst, rsize):
     return None
 
 
-LAYOUT_CC, LAYOUT_CKONG, LAYOUT_RPATROL, LAYOUT_SWIMMER = 0, 1, 2, 3
+LAYOUT_CC, LAYOUT_CKONG, LAYOUT_RPATROL, LAYOUT_SWIMMER, LAYOUT_CANNONB, LAYOUT_TANGRAMQ = 0, 1, 2, 3, 4, 5
 
 F_DECRYPT, F_VOL5, F_VERT, F_NMIQ3, F_SWIMMER, F_ROT90 = 0x01, 0x08, 0x10, 0x20, 0x40, 0x80
 XOR = {"init_rpatrol": 1 << 1, "init_ckongb": 2 << 1, "init_dking": 3 << 1}
 
 BUTTONS = {
+    LAYOUT_TANGRAMQ: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "2-way horizontal", ""),
+    LAYOUT_CANNONB: ("Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
     LAYOUT_SWIMMER: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "8-way", ""),
     LAYOUT_CC:      ("R Right,R Left,R Down,R Up,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 4, "8-way", "twin stick"),
     LAYOUT_CKONG:   ("Jump,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
@@ -85,6 +107,16 @@ SW_COIN = [('Coin A', "4,5", "1C/1C,2C/1C,1C/2C,1C/3C"),
            ('Cabinet', "12", "Cocktail,Upright")]
 
 DIPS = {
+    "tangramq": ("8E,FF", [('Lives', "0,1", "1,2,3,5"),
+                           ('Freeze', "2", "On,Off"),
+                           ('Demo Sounds', "3", "Off,On"),
+                           ('Coinage', "4,6", "1C/1C,1C/2C,1C/3C,1C/5C,1C/6C,2C/1C,3C/1C,4C/1C"),
+                           ('Cabinet', "7", "Cocktail,Upright"),
+                           ('Free Play', "11", "On,Off"),
+                           ('Infinite Lives', "12", "On,Off")]),
+    "cannonb":  ("E7",    [('Display', "0,1", "None,Scores Only,Progress Bars Only,Scores and Progress Bars"),
+                           ('Cabinet', "2", "Cocktail,Upright"),
+                           ('Lives', "3,4", "3,4,5,6")]),
     "swimmer":  ("00,30", [('Lives', "0,1", "3,4,5,Infinite (Cheat)"),
                            ('Bonus Life', "2,3", "10000,20000,30000,None")] + SW_COIN +
                           [('Demo Sounds', "13", "Off,On"),
@@ -123,9 +155,9 @@ REGION_WORDS = [("US", "US"), ("Japan", "Japan"), ("Spanish", "Spain")]
 
 JOYSTICK_BY_INPUT = {"guzzler": "4-way"}
 
-SERIES_BY_PARENT = {"swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze"), "au": ("Au", "Action")}
+SERIES_BY_PARENT = {"tangramq": ("Tangram Q", "Puzzle"), "cannonbp": ("Cannon Ball", "Shooter"), "swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze"), "au": ("Au", "Action")}
 
-LAYOUT_BY_INPUT = {"au": LAYOUT_SWIMMER, "swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
+LAYOUT_BY_INPUT = {"tangramq": LAYOUT_TANGRAMQ, "cannonb": LAYOUT_CANNONB, "au": LAYOUT_SWIMMER, "swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
                    "cclimber": LAYOUT_CC, "cclimberj": LAYOUT_CC,
                    "ckong": LAYOUT_CKONG, "ckongb": LAYOUT_CKONG, "ckongb2": LAYOUT_CKONG,
                    "rpatrol": LAYOUT_RPATROL}
@@ -170,10 +202,15 @@ def parse_roms(src, setname):
     return segs
 
 
-def place(segs, setname, swimmer=False):
+def place(segs, setname, swimmer=False, tangramq=False):
     out = []
     for s in segs:
         if s["region"] in IGNORED_REGIONS:
+            continue
+        if tangramq:
+            if s["region"] not in TANGRAMQ_REGIONS:
+                raise SystemExit(f"{setname}: unmapped region {s['region']}")
+            out.append(dict(s, addr=TANGRAMQ_REGIONS[s["region"]] + s["dst"]))
             continue
         if swimmer:
             hit = swimmer_region(s["region"], s["dst"], s["rsize"])
@@ -183,6 +220,8 @@ def place(segs, setname, swimmer=False):
             continue
         if s["region"] not in REGIONS:
             raise SystemExit(f"{setname}: unmapped region {s['region']}")
+        if s["region"] == "maincpu" and s["dst"] >= 0x10000:
+            s = dict(s, dst=s["dst"] - 0x10000)              # cannonb stages its encrypted ROM at 0x10000
         base, size = REGIONS[s["region"]]
         if s["dst"] >= size:
             continue                                   # e.g. dking's extra 82s129 past the palette PROMs
@@ -208,7 +247,7 @@ def flags_for(g, segs):
         f |= F_DECRYPT
     f |= XOR.get(g["init"], 0)
     layout = LAYOUT_BY_INPUT[g["inputs"]]
-    if layout == LAYOUT_CKONG:
+    if layout in (LAYOUT_CKONG, LAYOUT_CANNONB):
         f |= F_VOL5                                    # Falcon redraw shows the D4 resistor fitted
     if g["rot"] in ("ROT90", "ROT270"):
         f |= F_VERT
@@ -233,9 +272,12 @@ def mra(g, games, segs):
     series, category = SERIES_BY_PARENT.get(parent, SERIES.get(layout))
     region = next((r for w, r in REGION_WORDS if w in g["desc"]), "World")
     has_dprom = any(s["region"] == "decryption_prom" for s in segs)
-    rom_index = 2 if flags & F_SWIMMER else 0
-    variant = f" {VARIANT[g['machine']]:02X}" if g["machine"] in VARIANT else ""
-    if rom_index == 2:
+    rom_index = rom_index_for(g)
+    v = variant_for(g)
+    variant = f" {v:02X}" if v is not None else ""
+    if rom_index == 5:
+        index0 = "CPU 0x0000, tiles 0x6000, big sprite 0xA000, sound CPU 0xC000, palette PROMs 0xE000"
+    elif rom_index == 2:
         index0 = ("CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tile planes 0xC000 (8K slots), "
                   "big sprite 0x12000" + (", palette PROMs 0x15000" if any(s["region"] == "proms" for s in segs) else ""))
     else:
@@ -340,7 +382,8 @@ def safe(name):
 def out_path(root, g, games):
     if g["parent"] is None:
         return root / f"{safe(display_name(g))}.mra"
-    parent_title = display_name(games[g["parent"]])
+    # a parent in another MAME driver (cannonbp is Pac-Man hardware) still names the folder
+    parent_title = display_name(games[g["parent"]]) if g["parent"] in games else title_case(clean_title(g["desc"]))
     return root / "_alternatives" / f"_{safe(parent_title)}" / f"{safe(display_name(g))}.mra"
 
 
@@ -350,7 +393,7 @@ def main():
     games = parse_games(src)
     for name in sys.argv[3:]:
         g = games[name]
-        segs = place(parse_roms(src, name), name, g["machine"] in SWIMMER_MACHINES)
+        segs = place(parse_roms(src, name), name, g["machine"] in SWIMMER_MACHINES, g["machine"] == "tangramq")
         path = out_path(out_dir, g, games)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(mra(g, games, segs))

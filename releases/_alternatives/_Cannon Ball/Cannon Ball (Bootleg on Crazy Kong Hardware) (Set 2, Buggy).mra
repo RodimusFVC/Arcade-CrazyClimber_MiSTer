@@ -1,0 +1,67 @@
+<misterromdescription>
+    <name>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 2, Buggy)</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>yes</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Cannon Ball</series>
+    <year>1985</year>
+    <manufacturer>bootleg (TV Game Gruenberg)</manufacturer>
+    <category>Shooter</category>
+
+    <setname>cannonb2</setname>
+    <parent>cannonbp</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (cw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>4-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="E7">
+        <dip name="Display" bits="0,1" ids="None,Scores Only,Progress Bars Only,Scores and Progress Bars"/>
+        <dip name="Cabinet" bits="2" ids="Cocktail,Upright"/>
+        <dip name="Lives" bits="3,4" ids="3,4,5,6"/>
+    </switches>
+
+    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
+    <rom index="0" md5="none" zip="cannonb2.zip|cannonbp.zip">
+        <part crc="7a3cba7c" name="cb1.bin"/>
+        <part crc="58ef3118" name="cb2.bin"/>
+        <part crc="e18a836b" name="cb3.bin"/>
+        <part crc="696ebdb0" name="cb4.bin"/>
+        <part repeat="0x2000">00</part>
+        <part crc="602a6c2d" name="cb10.bin" offset="0x0" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="602a6c2d" name="cb10.bin" offset="0x800" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="2d036026" name="cb9.bin" offset="0x0" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="2d036026" name="cb9.bin" offset="0x800" length="0x800"/>
+        <part repeat="0x800">00</part>
+        <part crc="80eb517d" name="cb7.bin"/>
+        <part crc="f67c80f1" name="cb8.bin"/>
+        <part crc="5f0bcdfb" name="cb6.bin"/>
+        <part crc="9003ffbd" name="cb5.bin"/>
+        <part crc="751c3325" name="v6.bin"/>
+        <part crc="c0539747" name="u6.bin"/>
+        <part crc="b4e827a5" name="t6.bin"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>04 98 02</part>
+    </rom>
+
+    <remark>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 2, Buggy) (TV Game Gruenberg Bootleg)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>
