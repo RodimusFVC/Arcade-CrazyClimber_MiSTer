@@ -30,21 +30,29 @@ REGIONS = {
 # ---------------------------------------------------------------- per-family setup
 
 # Swimmer board (machine swimmer/guzzler) loads through ioctl index 2 with its own map
-SWIMMER_MACHINES = {"swimmer", "guzzler"}
+SWIMMER_MACHINES = {"swimmer", "guzzler", "au"}
+VARIANT = {"au": 0x01}                             # index 1 byte 2: board variant
 IGNORED_REGIONS = {"cpu_pal"}                      # guzzlers' PAL16L8 dump, not used by the core
 
 
-def swimmer_region(region, dst):
-    """(ioctl address, region size) for a Swimmer-board load, or None if the region is unknown."""
+def swimmer_region(region, dst, rsize):
+    """ioctl address for a Swimmer-board load (see rom_loader.sv), or None if the region is unknown."""
     if region == "maincpu":
         if dst < 0x8000:
-            return dst, 0x8000
+            return dst
         if dst >= 0xE000:
-            return 0x8000 + (dst - 0xE000), 0x10000
+            return 0x8000 + (dst - 0xE000)
         return None
-    base = {"audiocpu": (0x0A000, 0x1000), "tile": (0x0B000, 0x3000),
-            "bigsprite": (0x0E000, 0x3000), "proms": (0x11000, 0x0220)}.get(region)
-    return None if base is None else (base[0] + dst, base[1])
+    if region == "audiocpu" and dst < 0x1000:
+        return 0x0A000 + dst
+    if region in ("tile", "bigsprite"):
+        plane = rsize // 3                                  # RGN_FRAC(1,3) planes, MSB first
+        slot = 0x2000 if region == "tile" else 0x1000
+        base = 0x0C000 if region == "tile" else 0x12000
+        return base + (dst // plane) * slot + dst % plane
+    if region == "proms":
+        return 0x15000 + dst
+    return None
 
 
 LAYOUT_CC, LAYOUT_CKONG, LAYOUT_RPATROL, LAYOUT_SWIMMER = 0, 1, 2, 3
@@ -85,6 +93,11 @@ DIPS = {
                            ('Bonus Life', "2,3", "10000,20000,30000,None")] + SW_COIN +
                           [('Demo Sounds', "13", "Off,On"),
                            ('Difficulty', "14", "Easy,Hard")]),
+    "au":       ("00,80", [('Coin A', "0,1", "1C/1C,1C/2C,1C/3C,Disabled"),
+                           ('Coin B', "2,3", "1C/1C,2C/1C,1C/2C,1C/3C"),
+                           ('Bonus Life', "4,5", "30K 100K Every 100K,20K 50K Every 50K,30K,None"),
+                           ('Lives', "6,7", "3,4,5,Infinite (Cheat)"),
+                           ('Cabinet', "15", "Cocktail,Upright")]),
     "guzzler":  ("00,10", [('Lives', "0,1", "3,4,5,Infinite (Cheat)"),
                            ('Bonus Life', "2,3", "30K Every 100K,20K Every 50K,30K Only,None")] + SW_COIN +
                           [('High Score Names', "13", "10 Letters,3 Letters"),
@@ -110,9 +123,9 @@ REGION_WORDS = [("US", "US"), ("Japan", "Japan"), ("Spanish", "Spain")]
 
 JOYSTICK_BY_INPUT = {"guzzler": "4-way"}
 
-SERIES_BY_PARENT = {"swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze")}
+SERIES_BY_PARENT = {"swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze"), "au": ("Au", "Action")}
 
-LAYOUT_BY_INPUT = {"swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
+LAYOUT_BY_INPUT = {"au": LAYOUT_SWIMMER, "swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
                    "cclimber": LAYOUT_CC, "cclimberj": LAYOUT_CC,
                    "ckong": LAYOUT_CKONG, "ckongb": LAYOUT_CKONG, "ckongb2": LAYOUT_CKONG,
                    "rpatrol": LAYOUT_RPATROL}
@@ -122,7 +135,7 @@ LAYOUT_BY_INPUT = {"swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzl
 GAME_RE = re.compile(r'^GAME\(\s*(\d+),\s*(\w+),\s*(\w+),\s*(\w+),\s*(\w+),\s*\w+,\s*(\w+),\s*(ROT\d+),\s*"([^"]*)",\s*"([^"]*)"', re.M)
 LOAD_RE = re.compile(r'ROM_LOAD\(\s*"([^"]+)",\s*(0x[0-9a-fA-F]+),\s*(0x[0-9a-fA-F]+),\s*(?:BAD_DUMP\s+)?CRC\(([0-9a-fA-F]+)\)')
 CONT_RE = re.compile(r'ROM_CONTINUE\(\s*(0x[0-9a-fA-F]+),\s*(0x[0-9a-fA-F]+)\s*\)')
-REGION_RE = re.compile(r'ROM_REGION\(\s*0x[0-9a-fA-F]+,\s*"([^"]+)"')
+REGION_RE = re.compile(r'ROM_REGION\(\s*(0x[0-9a-fA-F]+),\s*"([^"]+)"')
 
 
 def parse_games(src):
@@ -138,14 +151,14 @@ def parse_roms(src, setname):
     m = re.search(r'ROM_START\(\s*%s\s*\)(.*?)ROM_END' % re.escape(setname), src, re.S)
     if not m:
         raise SystemExit(f"ROM_START({setname}) not found")
-    segs, region, last = [], None, None
+    segs, region, rsize, last = [], None, 0, None
     for line in m.group(1).splitlines():
         line = line.split("//")[0]
         if (r := REGION_RE.search(line)):
-            region, last = r.group(1), None
+            region, rsize, last = r.group(2), int(r.group(1), 16), None
         elif (l := LOAD_RE.search(line)):
             name, off, length, crc = l.group(1), int(l.group(2), 16), int(l.group(3), 16), l.group(4).lower()
-            last = dict(name=name, crc=crc, src=0, dst=off, len=length, region=region)
+            last = dict(name=name, crc=crc, src=0, dst=off, len=length, region=region, rsize=rsize)
             segs.append(last)
         elif (c := CONT_RE.search(line)):
             off, length = int(c.group(1), 16), int(c.group(2), 16)
@@ -163,10 +176,10 @@ def place(segs, setname, swimmer=False):
         if s["region"] in IGNORED_REGIONS:
             continue
         if swimmer:
-            hit = swimmer_region(s["region"], s["dst"])
+            hit = swimmer_region(s["region"], s["dst"], s["rsize"])
             if hit is None:
                 raise SystemExit(f"{setname}: unmapped region {s['region']} @ 0x{s['dst']:X}")
-            out.append(dict(s, addr=hit[0]))
+            out.append(dict(s, addr=hit))
             continue
         if s["region"] not in REGIONS:
             raise SystemExit(f"{setname}: unmapped region {s['region']}")
@@ -221,9 +234,10 @@ def mra(g, games, segs):
     region = next((r for w, r in REGION_WORDS if w in g["desc"]), "World")
     has_dprom = any(s["region"] == "decryption_prom" for s in segs)
     rom_index = 2 if flags & F_SWIMMER else 0
+    variant = f" {VARIANT[g['machine']]:02X}" if g["machine"] in VARIANT else ""
     if rom_index == 2:
-        index0 = ("CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tiles 0xB000, big sprite 0xE000, "
-                  "palette PROMs 0x11000")
+        index0 = ("CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tile planes 0xC000 (8K slots), "
+                  "big sprite 0x12000" + (", palette PROMs 0x15000" if any(s["region"] == "proms" for s in segs) else ""))
     else:
         index0 = ("CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000"
                   + (", decryption PROM 0xD100" if has_dprom else ""))
@@ -280,7 +294,7 @@ def mra(g, games, segs):
 
     <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
     <rom index="1">
-        <part>{layout:02X} {flags:02X}</part>
+        <part>{layout:02X} {flags:02X}{variant}</part>
     </rom>
 
     <remark>{remark(g)}</remark>

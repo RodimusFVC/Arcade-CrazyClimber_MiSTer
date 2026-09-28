@@ -1,0 +1,62 @@
+<misterromdescription>
+    <name>Au</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>no</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Au</series>
+    <year>1983</year>
+    <manufacturer>Tehkan</manufacturer>
+    <category>Action</category>
+
+    <setname>au</setname>
+    <parent>au</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (cw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>8-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="00,80">
+        <dip name="Coin A" bits="0,1" ids="1C/1C,1C/2C,1C/3C,Disabled"/>
+        <dip name="Coin B" bits="2,3" ids="1C/1C,2C/1C,1C/2C,1C/3C"/>
+        <dip name="Bonus Life" bits="4,5" ids="30K 100K Every 100K,20K 50K Every 50K,30K,None"/>
+        <dip name="Lives" bits="6,7" ids="3,4,5,Infinite (Cheat)"/>
+        <dip name="Cabinet" bits="15" ids="Cocktail,Upright"/>
+    </switches>
+
+    <!-- Index 2: CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tile planes 0xC000 (8K slots), big sprite 0x12000 -->
+    <rom index="2" md5="none" zip="au.zip">
+        <part crc="04c7ebc9" name="program0.e8"/>
+        <part crc="d3820146" name="program1.b8"/>
+        <part crc="da85cf0f" name="program2.d8"/>
+        <part crc="fa4bc959" name="program3.a8"/>
+        <part repeat="0x2000">00</part>
+        <part crc="0315f0a1" name="sound0.c4"/>
+        <part repeat="0x1000">00</part>
+        <part crc="faa24ff4" name="tile2.bin"/>
+        <part crc="2bd7aa4e" name="tile1.bin"/>
+        <part crc="d5a8bf00" name="tile0.bin"/>
+        <part crc="19d65322" name="big2.g7"/>
+        <part crc="dd2bf0ba" name="big1.e7"/>
+        <part crc="4a22394e" name="big0.c7"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>03 D0 01</part>
+    </rom>
+
+    <remark>Au (Location Test) (Tehkan)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

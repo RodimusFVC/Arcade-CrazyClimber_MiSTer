@@ -82,11 +82,13 @@ assign BUTTONS = 0;
 //           [5] latch Q3 drives the NMI mask, [6] Swimmer board (ROMs on index 2), [7] vertical is ROT90
 reg [7:0] game_layout = 8'd0;
 reg [7:0] game_flags  = 8'd1;
+reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au
 
 always @(posedge CLK_49M) begin
 	if (ioctl_wr && ioctl_index == 8'd1) begin
-		if (ioctl_addr == 25'd0) game_layout <= ioctl_dout;
+		if (ioctl_addr == 25'd0) begin game_layout <= ioctl_dout; game_var <= 8'd0; end
 		if (ioctl_addr == 25'd1) game_flags  <= ioctl_dout;
+		if (ioctl_addr == 25'd2) game_var    <= ioctl_dout;
 	end
 end
 
@@ -262,18 +264,29 @@ always @(posedge CLK_49M) begin
 		dip_sw[ioctl_addr[2:0]] <= ioctl_dout;
 end
 
-// Guzzler coins are PORT_IMPULSE(2): a press registers for two frames however long it is held
+// Swimmer-board coins are PORT_IMPULSE(2): a press is latched, then presented for exactly two whole
+// frames starting at the next vblank, however long or briefly it is held
 reg       vblank_d = 1'b0;
 reg       coin1_d = 1'b0, coin2_d = 1'b0;
+reg       coin1_pend = 1'b0, coin2_pend = 1'b0;
 reg [1:0] coin1_frames = 2'd0, coin2_frames = 2'd0;
+wire      vblank_rise = vblank & ~vblank_d;
 always @(posedge CLK_49M) begin
 	vblank_d <= vblank;
 	coin1_d  <= m_coin1;
 	coin2_d  <= m_coin2;
-	if (m_coin1 & ~coin1_d) coin1_frames <= 2'd2;
-	else if (vblank & ~vblank_d && coin1_frames != 2'd0) coin1_frames <= coin1_frames - 2'd1;
-	if (m_coin2 & ~coin2_d) coin2_frames <= 2'd2;
-	else if (vblank & ~vblank_d && coin2_frames != 2'd0) coin2_frames <= coin2_frames - 2'd1;
+
+	if (m_coin1 & ~coin1_d) coin1_pend <= 1'b1;
+	if (vblank_rise) begin
+		if (coin1_pend)                 begin coin1_frames <= 2'd2; coin1_pend <= 1'b0; end
+		else if (coin1_frames != 2'd0)  coin1_frames <= coin1_frames - 2'd1;
+	end
+
+	if (m_coin2 & ~coin2_d) coin2_pend <= 1'b1;
+	if (vblank_rise) begin
+		if (coin2_pend)                 begin coin2_frames <= 2'd2; coin2_pend <= 1'b0; end
+		else if (coin2_frames != 2'd0)  coin2_frames <= coin2_frames - 2'd1;
+	end
 end
 wire coin1_imp = |coin1_frames;
 wire coin2_imp = |coin2_frames;
@@ -358,6 +371,7 @@ cclimber_board board
 	.pause(pause_cpu),
 
 	.swimmer(game_flags[6]),
+	.au(game_var[0]),
 	.decrypt_en(game_flags[0]),
 	.rom_xor(game_flags[2:1]),
 	.vol5_en(game_flags[3]),

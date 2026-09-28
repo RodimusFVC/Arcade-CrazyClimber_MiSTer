@@ -37,7 +37,7 @@
         <dip name="Difficulty" bits="14" ids="Easy,Hard"/>
     </switches>
 
-    <!-- Index 2: CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tiles 0xB000, big sprite 0xE000, palette PROMs 0x11000 -->
+    <!-- Index 2: CPU 0x0000 + E000 at 0x8000, sound CPU 0xA000, tile planes 0xC000 (8K slots), big sprite 0x12000, palette PROMs 0x15000 -->
     <rom index="2" md5="none" zip="swimmerb.zip|swimmer.zip">
         <part crc="b045be08" name="sw1.9l"/>
         <part crc="163d65e5" name="sw2.9k"/>
@@ -49,9 +49,13 @@
         <part crc="191a16e4" name="sw8.9a"/>
         <part repeat="0x2000">00</part>
         <part crc="2eee9bcb" name="sw12.4k"/>
+        <part repeat="0x1000">00</part>
         <part crc="4f3608cb" name="sw15.18k"/>
+        <part repeat="0x1000">00</part>
         <part crc="7181c8b4" name="sw14.18l"/>
+        <part repeat="0x1000">00</part>
         <part crc="2eb1af5c" name="sw13.18m"/>
+        <part repeat="0x1000">00</part>
         <part crc="9ca67e24" name="sw23.6c"/>
         <part repeat="0x800">00</part>
         <part crc="02c10992" name="sw22.5c"/>

@@ -19,6 +19,7 @@ module cclimber_board
     input               pause,
 
     input               swimmer,        // Swimmer board (3bpp, sound CPU)
+    input               au,             // Au: Swimmer board with 8K planes and palette RAM
     input               decrypt_en,     // dm7052 opcode decryption PROM fitted
     input         [1:0] rom_xor,        // 0 none, 1 rpatrol, 2 ckongb, 3 dking
     input               vol5_en,        // volume D4 resistor fitted
@@ -102,8 +103,8 @@ wire dl_pal_hi = ioctl_wr2 & sw_pal_hi_cs;
 wire dl_bspal  = (ioctl_wr0 & bspal_cs) | (ioctl_wr2 & sw_bspal_cs);
 wire dl_dprom  = ioctl_wr0 & dprom_cs;
 
-// Plane RAM addresses: index 0 planes are 8K (tiles) / 2K (big sprite), index 2 planes are 4K
-wire [12:0] dl_tile_addr = ioctl_wr2 ? {1'b0, ioctl_addr[11:0]} : ioctl_addr[12:0];
+// Plane RAM addresses: tile slots are 8K on both indexes, big sprite planes 2K (index 0) / 4K (index 2)
+wire [12:0] dl_tile_addr = ioctl_addr[12:0];
 wire [11:0] dl_bs_addr   = ioctl_wr2 ? ioctl_addr[11:0] : {1'b0, ioctl_addr[10:0]};
 
 //------------------------------------------------------- Video timing --------------------------------------------------------//
@@ -163,8 +164,8 @@ wire [4:0] x_tile_v  = x_tile ^ {5{hinv}};
 reg [7:0] mainlatch = 8'h00;
 assign flip_x = mainlatch[1];
 assign flip_y = mainlatch[2];
-wire   sidebg_en  = swimmer & mainlatch[3];
-wire   pal_bank   = swimmer & mainlatch[4];
+wire   sidebg_en  = swimmer & ~au & mainlatch[3];
+wire   pal_bank   = swimmer & ~au & mainlatch[4];
 
 // Z80 clock is ~H0: it rises as hcnt steps odd -> even
 wire cpu_rise = ce_px &  hcnt[0];
@@ -370,7 +371,17 @@ end
 
 // Swimmer background colour register ($B800)
 reg [7:0] bgcolor = 8'd0;
-always_ff @(posedge clk) if (ce12 && b800_we && swimmer) bgcolor <= cpu_do;
+always_ff @(posedge clk) if (ce12 && b800_we && swimmer && !au) bgcolor <= cpu_do;
+
+// Au palette RAM: B800-B87F (mirror 0780), 64 x xBGR_333 big-endian words; even byte = B, odd byte = G/R
+reg [7:0] aupal_b  [64];
+reg [7:0] aupal_gr [64];
+always_ff @(posedge clk) begin
+    if (ce12 && b800_we && au) begin
+        if (cpu_addr[0]) aupal_gr[cpu_addr[6:1]] <= cpu_do;
+        else             aupal_b[cpu_addr[6:1]]  <= cpu_do;
+    end
+end
 
 //------------------------------------------------------- Colour RAM (scroll, sprites, attributes) ----------------------------//
 
@@ -472,8 +483,9 @@ always_comb begin
     endcase
 end
 
-// Code bank bits: CC {attr4, attr5} (8K planes); Swimmer attr4 only (4K planes, 512 chars / 128 sprites)
-wire [1:0] code_hi = swimmer ? {1'b0, attr_sp_bg[4]} : {attr_sp_bg[4], attr_sp_bg[5]};
+// Code bank bits: CC {attr4, attr5}; Swimmer attr4 only (4K planes, 512 chars / 128 sprites); Au {attr5, attr4}
+wire [1:0] code_hi = au      ? {attr_sp_bg[5], attr_sp_bg[4]} :
+                     swimmer ? {1'b0, attr_sp_bg[4]} : {attr_sp_bg[4], attr_sp_bg[5]};
 
 always_ff @(posedge clk) begin
     if (ce12) begin
@@ -534,15 +546,15 @@ dpram_dc #(.widthad_a(13)) tile_rom1
     .q_b(tile_rom1_do)
 );
 
-dpram_dc #(.widthad_a(12)) tile_rom2
+dpram_dc #(.widthad_a(13)) tile_rom2
 (
     .clock_a(clk),
-    .address_a(dl_tile_addr[11:0]),
+    .address_a(dl_tile_addr),
     .data_a(ioctl_dout),
     .wren_a(dl_tile2),
 
     .clock_b(clk),
-    .address_b(tile_graph_rom_addr[11:0]),
+    .address_b(tile_graph_rom_addr),
     .q_b(tile_rom2_do)
 );
 
@@ -720,12 +732,13 @@ always_ff @(posedge clk) begin
     end
 end
 
-// Big sprite pen: CC {colour3, 2 bits}, Swimmer {colour2, 3 bits} (32-entry PROM either way)
+// Big sprite pen: CC {colour3, 2 bits} and Swimmer {colour2, 3 bits} index a 32-entry PROM;
+// Au {colour3, 3 bits} indexes the palette RAM
 wire [2:0] bs_sel = ~x_big_sprite[2:0];
-wire [4:0] bs_pixel_color = swimmer ? {attr_big_sprite[1:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel], bs_graph3_d[bs_sel]}
-                                    : {attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel]};
+wire [5:0] bs_pixel_color = swimmer ? {attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel], bs_graph3_d[bs_sel]}
+                                    : {1'b0, attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel]};
 
-reg [4:0] bs_pixel_color_r = 5'd0;
+reg [5:0] bs_pixel_color_r = 6'd0;
 reg       bs_pixel_vis_r = 1'b0;
 reg       is_big_sprite_on = 1'b0;
 
@@ -733,7 +746,7 @@ always_ff @(posedge clk) begin
     if (ce12) begin
         bs_pixel_color_r <= bs_pixel_color;
         bs_pixel_vis_r   <= bs_vis_d[bs_sel];
-        is_big_sprite_on <= pix_on(swimmer, {3'b000, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r;
+        is_big_sprite_on <= pix_on(swimmer, {2'b00, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r;
     end
 end
 
@@ -753,13 +766,21 @@ end
 
 reg [7:0] do_palette = 8'd0, do_bs_palette = 8'd0;
 reg [3:0] do_pal_lo = 4'd0, do_pal_hi = 4'd0;
+reg [7:0] do_au_b = 8'd0, do_au_gr = 8'd0, do_aubs_b = 8'd0, do_aubs_gr = 8'd0;
+
+// Au: 64 pens; empty playfield pixels show pen 0
+wire [5:0] au_pen = pf_clear_r ? 6'd0 : pixel_color_r[5:0];
 
 always_ff @(posedge clk) begin
     if (ce12) begin
         do_palette    <= pal[pixel_color_r[5:0]];
         do_pal_lo     <= pal_lo[pixel_color_r];
         do_pal_hi     <= pal_hi[pixel_color_r];
-        do_bs_palette <= bspal[bs_pixel_color_r];
+        do_bs_palette <= bspal[bs_pixel_color_r[4:0]];
+        do_au_b       <= aupal_b[au_pen];
+        do_au_gr      <= aupal_gr[au_pen];
+        do_aubs_b     <= aupal_b[bs_pixel_color_r];
+        do_aubs_gr    <= aupal_gr[bs_pixel_color_r];
     end
 end
 
@@ -788,9 +809,20 @@ function automatic [23:0] sw_rgb(input [7:0] p);
     sw_rgb = {p[2:0], 5'd0, p[5:3], 5'd0, p[7:6], 6'd0};
 endfunction
 
-wire [23:0] pf_rgb = swimmer ? {do_pal_lo[2:0], 5'd0, do_pal_hi[1:0], do_pal_lo[3], 5'd0, do_pal_hi[3:2], 6'd0}
+// Au xBGR_333: MAME pal3bit expansion
+function automatic [7:0] pal3(input [2:0] v);
+    pal3 = {v, v, v[2:1]};
+endfunction
+
+function automatic [23:0] au_rgb(input [7:0] b, input [7:0] gr);
+    au_rgb = {pal3(gr[2:0]), pal3(gr[6:4]), pal3(b[2:0])};
+endfunction
+
+wire [23:0] pf_rgb = au      ? au_rgb(do_au_b, do_au_gr) :
+                     swimmer ? {do_pal_lo[2:0], 5'd0, do_pal_hi[1:0], do_pal_lo[3], 5'd0, do_pal_hi[3:2], 6'd0}
                              : cc_rgb(do_palette);
-wire [23:0] bs_rgb = swimmer ? sw_rgb(do_bs_palette) : cc_rgb(do_bs_palette);
+wire [23:0] bs_rgb = au      ? au_rgb(do_aubs_b, do_aubs_gr) :
+                     swimmer ? sw_rgb(do_bs_palette) : cc_rgb(do_bs_palette);
 
 // Swimmer empty pixels: background register, or the fixed side panel colour right of column 24
 wire [23:0] bg_rgb   = {bgcolor[7:6], 6'd0, bgcolor[5:3], 5'd0, bgcolor[2:0], 5'd0};
@@ -809,7 +841,7 @@ reg [23:0] video_mux;
 always_comb begin
     if (is_big_sprite_on && !(bs_prio && sprite_on_r))
         video_mux = bs_rgb;
-    else if (swimmer && pf_clear_d)
+    else if (swimmer && !au && pf_clear_d)
         video_mux = side_area ? side_rgb : bg_rgb;
     else
         video_mux = pf_rgb;
@@ -866,6 +898,8 @@ swimmer_snd snd_sw
     .clk(clk),
     .reset(reset | ~swimmer),
     .pause(pause),
+    .au(au),
+    .vblank(video_vblank),
 
     .latch_we(swimmer & a800_we_d & ~a800_we),
     .latch_din(cpu_do),

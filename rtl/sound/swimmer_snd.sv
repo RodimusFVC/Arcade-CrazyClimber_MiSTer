@@ -13,6 +13,8 @@ module swimmer_snd
     input               clk,            // 49.152 MHz
     input               reset,
     input               pause,
+    input               au,             // Au: 3.072 MHz CPU, AYs at half that, NMI from main vblank
+    input               vblank,
 
     input               latch_we,       // main CPU write to $A800 (/WRS)
     input         [7:0] latch_din,
@@ -44,6 +46,14 @@ reg [12:0] nmi_div = 13'd0;
 always_ff @(posedge clk) if (cen_2m) nmi_div <= nmi_div + 13'd1;
 wire nmi_tick = cen_2m && (nmi_div == 13'h1FFF);
 
+// Au: 18.432 / 6 = 3.072 MHz
+reg [3:0] div16 = 4'd0;
+always_ff @(posedge clk) div16 <= div16 + 4'd1;
+wire cen_cpu = au ? (div16 == 4'd0) : cen_2m;
+
+reg vblank_d = 1'b0;
+always_ff @(posedge clk) vblank_d <= vblank;
+
 //------------------------------------------------------- Z80 -----------------------------------------------------------------//
 
 wire [15:0] addr;
@@ -57,7 +67,7 @@ T80s #(.Mode(0), .T2Write(1), .IOWait(1)) z80
 (
     .RESET_n(~reset),
     .CLK(clk),
-    .CEN(cen_2m & ~pause),
+    .CEN(cen_cpu & ~pause),
     .WAIT_n(1'b1),
     .INT_n(int_n),
     .NMI_n(nmi_n),
@@ -133,13 +143,13 @@ always_ff @(posedge clk) begin
     end
 end
 
-// 244 Hz NMI held until any 4000 access
+// NMI held until any 4000 access: 244 Hz timer, or on Au the main board's vblank (released at its end)
 always_ff @(posedge clk) begin
     if (reset)
         nmi_n <= 1'b1;
-    else if ((mem_rd | mem_wr) & nmic_cs)
+    else if (((mem_rd | mem_wr) & nmic_cs) || (au && !vblank && vblank_d))
         nmi_n <= 1'b1;
-    else if (nmi_tick)
+    else if (au ? (vblank && !vblank_d) : nmi_tick)
         nmi_n <= 1'b0;
 end
 
@@ -164,11 +174,11 @@ jt49_bus #(.COMP(3'b010)) ay1
 (
     .rst_n(~reset),
     .clk(clk),
-    .clk_en(cen_2m),
+    .clk_en(cen_cpu),
     .bdir(ay1_bdir),
     .bc1(ay_bc1 & ~addr[7]),
     .din(cpu_do),
-    .sel(1'b1),
+    .sel(~au),
     .dout(),
     .sound(),
     .A(a1),
@@ -185,11 +195,11 @@ jt49_bus #(.COMP(3'b010)) ay2
 (
     .rst_n(~reset),
     .clk(clk),
-    .clk_en(cen_2m),
+    .clk_en(cen_cpu),
     .bdir(ay2_bdir),
     .bc1(ay_bc1 & addr[7]),
     .din(cpu_do),
-    .sel(1'b1),
+    .sel(~au),
     .dout(),
     .sound(),
     .A(a2),
