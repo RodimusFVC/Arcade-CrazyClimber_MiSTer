@@ -23,6 +23,7 @@ module cclimber_snd
     input         [7:0] cpu_do,
     input               trigger,        // LS259 Q4
     input               vol5_en,        // volume D4 (47K) fitted
+    input               toprollr,       // Top Roller: 12 MHz board, AY 1.5 MHz, sample base = AY clock / 4, ROM on ioctl index 7
 
     input        [24:0] ioctl_addr,
     input         [7:0] ioctl_dout,
@@ -37,9 +38,27 @@ module cclimber_snd
 reg [9:0] div = 10'd0;
 always_ff @(posedge clk) div <= div + 10'd1;
 
-wire cen_ay  = div[4:0] == 5'd0;
-wire cen_smp = div[5:0] == 6'd0;
-wire cen_dc  = div == 10'd0;
+wire cen_ay_cc  = div[4:0] == 5'd0;
+wire cen_smp_cc = div[5:0] == 6'd0;
+wire cen_dc     = div == 10'd0;
+
+// Top Roller (MAME: clock 12 MHz / 8, sample clockdiv 4): 1.5 MHz = 125/4096 of 49.152 MHz, sample base = every 4th
+reg [11:0] tr_frac = 12'd0;
+reg        tr_cen = 1'b0;
+reg  [1:0] tr_div = 2'd0;
+always_ff @(posedge clk) begin
+    if (tr_frac >= 12'd3971) begin
+        tr_frac <= tr_frac - 12'd3971;
+        tr_cen  <= 1'b1;
+    end else begin
+        tr_frac <= tr_frac + 12'd125;
+        tr_cen  <= 1'b0;
+    end
+    if (tr_cen) tr_div <= tr_div + 2'd1;
+end
+
+wire cen_ay  = toprollr ? tr_cen : cen_ay_cc;
+wire cen_smp = toprollr ? (tr_cen && tr_div == 2'd0) : cen_smp_cc;
 
 //------------------------------------------------------- AY-3-8910 -----------------------------------------------------------//
 
@@ -83,7 +102,7 @@ reg [13:0] smp_addr = 14'd0;
 dpram_dc #(.widthad_a(13)) smp_rom
 (
     .clock_a(clk),
-    .address_a(ioctl_addr[12:0] - 13'h1000),
+    .address_a(toprollr ? ioctl_addr[12:0] : ioctl_addr[12:0] - 13'h1000),   // index 7 window is 8K aligned
     .data_a(ioctl_dout),
     .wren_a(smp_wr),
 

@@ -16,6 +16,10 @@ import sys
 from pathlib import Path
 
 MAME_VERSION = "0289"
+HISCORE_DAT = Path("/CybertronMD/Mame/plugins/hiscore/hiscore.dat")   # current file (user, 2026-09-27)
+# hiscore.v header (Arabian's, proven): START_WAIT 0000FFFF, CHECK_WAIT 00FF, CHECK_HOLD 2, WRITE_HOLD 2,
+# WRITE_REPEATCOUNT 1, WRITE_REPEATWAIT 1111, PAUSEPAD 0, CHANGEMASK 0
+HISCORE_HEADER = "00 00 FF FF 00 FF 00 02 00 02 00 01 11 11 00 00"
 
 # region -> (base in ioctl index 0, size taken)
 REGIONS = {
@@ -25,6 +29,8 @@ REGIONS = {
     "cclimber_audio:samples": (0x0B000, 0x2000),
     "proms":                  (0x0D000, 0x0060),
     "decryption_prom":        (0x0D100, 0x0100),
+    "proms2":                 (0x0D200, 0x0020),       # Le Bagnard TMS5110 control PROM
+    "speech":                 (0x0E000, 0x2000),       # Le Bagnard speech ROMs
 }
 
 # ---------------------------------------------------------------- per-family setup
@@ -41,6 +47,10 @@ def variant_for(g):
         return 0x08
     if g["machine"] == "yamato":
         return 0x10
+    if g["machine"] == "toprollr":
+        return 0x20
+    if g["machine"] == "bagmanf":
+        return 0x40
     return None
 
 
@@ -51,6 +61,18 @@ YAMATO_REGIONS = {"maincpu": 0x00000, "tile": 0x08000, "bigsprite": 0x0C000, "au
                   "gradient": 0x10000, "proms": 0x12000}
 
 
+def toprollr_region(region, dst):
+    """Top Roller ioctl index 7 (see rom_loader.sv). user1 = 3 banks of 0x6000 whose top 8K is the same ROM."""
+    if region == "maincpu":
+        return 0x10000 + dst - 0xC000 if dst >= 0xC000 else None
+    if region == "user1":
+        bank, off = divmod(dst, 0x6000)
+        return bank * 0x4000 + off if off < 0x4000 else 0x0C000 + off - 0x4000
+    base = {"tile": 0x14000, "bigsprite": 0x18000, "gfx3": 0x1C000,
+            "cclimber_audio:samples": 0x1E000, "proms": 0x20000}.get(region)
+    return None if base is None else base + dst
+
+
 def rom_index_for(g):
     if g["machine"] in SWIMMER_MACHINES:
         return 2
@@ -58,6 +80,8 @@ def rom_index_for(g):
         return 5
     if g["machine"] == "yamato":
         return 6
+    if g["machine"] == "toprollr":
+        return 7
     return 0
 IGNORED_REGIONS = {"cpu_pal", "unused"}            # guzzlers' PAL16L8 dump, cannonb's stray ROMs
 
@@ -82,12 +106,14 @@ def swimmer_region(region, dst, rsize):
     return None
 
 
-LAYOUT_CC, LAYOUT_CKONG, LAYOUT_RPATROL, LAYOUT_SWIMMER, LAYOUT_CANNONB, LAYOUT_TANGRAMQ, LAYOUT_YAMATO = 0, 1, 2, 3, 4, 5, 6
+LAYOUT_CC, LAYOUT_CKONG, LAYOUT_RPATROL, LAYOUT_SWIMMER, LAYOUT_CANNONB, LAYOUT_TANGRAMQ, LAYOUT_YAMATO, LAYOUT_TOPROLLR = \
+    0, 1, 2, 3, 4, 5, 6, 7
 
 F_DECRYPT, F_VOL5, F_VERT, F_NMIQ3, F_SWIMMER, F_ROT90 = 0x01, 0x08, 0x10, 0x20, 0x40, 0x80
 XOR = {"init_rpatrol": 1 << 1, "init_ckongb": 2 << 1, "init_dking": 3 << 1}
 
 BUTTONS = {
+    LAYOUT_TOPROLLR: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
     LAYOUT_YAMATO: ("Button 1,Button 2,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 2, "8-way", ""),
     LAYOUT_TANGRAMQ: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "2-way horizontal", ""),
     LAYOUT_CANNONB: ("Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
@@ -121,6 +147,12 @@ YM_DSW1 = [('Lives', "0,1", "3,4,5,6"),
            ('Cabinet', "7", "Cocktail,Upright")]
 
 DIPS = {
+    "toprollr": ("80,00", [('Lives', "0,1", "3,4,5,6"),
+                           ('Coin A', "2,4", "1C/1C,2C/1C,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play"),
+                           ('Bonus Life', "5", "Every 30000,Every 50000"),
+                           ('Difficulty', "6", "Easy,Hard"),
+                           ('Cabinet', "7", "Cocktail,Upright"),
+                           ('Coin B', "8,10", "1C/1C,Invalid,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play")]),
     "yamato":   ("80,00", YM_DSW1),
     "yamatou":  ("80,00", YM_DSW1 + [('Coin B', "8,10", "1C/1C,2C/1C,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play")]),
     "tangramq": ("8E,FF", [('Lives', "0,1", "1,2,3,5"),
@@ -155,6 +187,12 @@ DIPS = {
     "ckong":     ("80",    [('Lives', "0,1", "3,4,5,6")] + CKONG_COMMON),
     "ckongb":    ("80",    [('Lives', "0,1", "1,2,3,4")] + CKONG_COMMON),
     "ckongb2":   ("80",    [('Lives', "0,1", "2,3,4,5")] + CKONG_COMMON),
+    "bagmanf":   ("FE",    [('Lives', "0,1", "5,4,3,2"),
+                            ('Coinage', "2", "2C/1C 1C/1C 1C/3C 1C/7C,1C/1C 1C/2C 1C/6C 1C/14C"),
+                            ('Difficulty', "3,4", "Hardest,Hard,Medium,Easy"),
+                            ('Language', "5", "French,English"),
+                            ('Bonus Life', "6", "40000,30000"),
+                            ('Cabinet', "7", "Cocktail,Upright")]),
     "rpatrol":   ("90",    [('Coinage', "0,1", "1C/1C,1C/2C,2C/1C,Free Play"),
                             ('Lives', "2,3", "3,4,5,6"),
                             ('Cabinet', "4", "Cocktail,Upright"),
@@ -171,11 +209,11 @@ REGION_WORDS = [("US", "US"), ("Japan", "Japan"), ("Spanish", "Spain")]
 
 JOYSTICK_BY_INPUT = {"guzzler": "4-way"}
 
-SERIES_BY_PARENT = {"yamato": ("Yamato", "Shooter"), "tangramq": ("Tangram Q", "Puzzle"), "cannonbp": ("Cannon Ball", "Shooter"), "swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze"), "au": ("Au", "Action")}
+SERIES_BY_PARENT = {"bagman": ("Bagman", "Platform"), "toprollr": ("Top Roller", "Driving"), "yamato": ("Yamato", "Shooter"), "tangramq": ("Tangram Q", "Puzzle"), "cannonbp": ("Cannon Ball", "Shooter"), "swimmer": ("Swimmer", "Action"), "guzzler": ("Guzzler", "Maze"), "au": ("Au", "Action")}
 
-LAYOUT_BY_INPUT = {"yamato": LAYOUT_YAMATO, "yamatou": LAYOUT_YAMATO, "tangramq": LAYOUT_TANGRAMQ, "cannonb": LAYOUT_CANNONB, "au": LAYOUT_SWIMMER, "swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
+LAYOUT_BY_INPUT = {"toprollr": LAYOUT_TOPROLLR, "yamato": LAYOUT_YAMATO, "yamatou": LAYOUT_YAMATO, "tangramq": LAYOUT_TANGRAMQ, "cannonb": LAYOUT_CANNONB, "au": LAYOUT_SWIMMER, "swimmer": LAYOUT_SWIMMER, "swimmerb": LAYOUT_SWIMMER, "guzzler": LAYOUT_SWIMMER,
                    "cclimber": LAYOUT_CC, "cclimberj": LAYOUT_CC,
-                   "ckong": LAYOUT_CKONG, "ckongb": LAYOUT_CKONG, "ckongb2": LAYOUT_CKONG,
+                   "ckong": LAYOUT_CKONG, "ckongb": LAYOUT_CKONG, "ckongb2": LAYOUT_CKONG, "bagmanf": LAYOUT_CKONG,
                    "rpatrol": LAYOUT_RPATROL}
 
 # ---------------------------------------------------------------- parsing
@@ -184,6 +222,54 @@ GAME_RE = re.compile(r'^GAME\(\s*(\d+),\s*(\w+),\s*(\w+),\s*(\w+),\s*(\w+),\s*\w
 LOAD_RE = re.compile(r'ROM_LOAD\(\s*"([^"]+)",\s*(0x[0-9a-fA-F]+),\s*(0x[0-9a-fA-F]+),\s*(?:BAD_DUMP\s+)?CRC\(([0-9a-fA-F]+)\)')
 CONT_RE = re.compile(r'ROM_CONTINUE\(\s*(0x[0-9a-fA-F]+),\s*(0x[0-9a-fA-F]+)\s*\)')
 REGION_RE = re.compile(r'ROM_REGION\(\s*(0x[0-9a-fA-F]+),\s*"([^"]+)"')
+
+
+def parse_hiscores(path):
+    """hiscore.dat -> {set: [(addr, len, start, end)]}; sets listed together share the entry lines below them."""
+    out, names, body = {}, [], False
+    for line in path.read_text(encoding="latin-1").splitlines():
+        line = line.strip()
+        if not line or line.startswith(";"):
+            names, body = ([], False) if not line else (names, body)
+            continue
+        if line.endswith(":"):
+            if body:
+                names, body = [], False
+            names.append(line[:-1])
+        elif line.startswith("@"):
+            for n in names:
+                out.setdefault(n, []).append(line)
+            body = True
+    return out
+
+
+HISCORES = parse_hiscores(HISCORE_DAT) if HISCORE_DAT.exists() else {}
+
+
+def hiscore_xml(g):
+    lines = HISCORES.get(g["name"])
+    if not lines:
+        return ""
+    ents = []
+    for line in lines:
+        f = line.split(",")
+        if f[0] != "@:maincpu" or f[1] != "program":
+            raise SystemExit(f'{g["name"]}: unsupported hiscore.dat line {line}')
+        ents.append((int(f[2], 16), int(f[3], 16), int(f[4], 16), int(f[5], 16)))
+    rows = "\n".join(f"            {a >> 24 & 0xFF:02X} {a >> 16 & 0xFF:02X} {a >> 8 & 0xFF:02X} {a & 0xFF:02X} "
+                      f"{n >> 8:02X} {n & 0xFF:02X} {s:02X} {e:02X}" for a, n, s, e in ents)
+    total = sum(n for _, n, _, _ in ents)
+    return f"""
+    <!-- Index 3: hiscore config (MAME hiscore.dat), index 4: saved scores -->
+    <rom index="3" md5="none">
+        <part>
+            {HISCORE_HEADER}
+{rows}
+        </part>
+    </rom>
+    <rom index="4"></rom>
+    <nvram index="4" size="{total}"></nvram>
+"""
 
 
 def parse_games(src):
@@ -213,15 +299,23 @@ def parse_roms(src, setname):
             nxt = dict(last, src=last["src"] + last["len"], dst=off, len=length)
             segs.append(nxt)
             last = nxt
+        elif "ROM_COPY" in line and setname == "toprollr":
+            continue                                   # the copied slice is one fixed ROM on the board (rom_loader.sv)
         elif "ROM_" in line and ("ROM_LOAD" in line or "ROM_COPY" in line or "ROM_FILL" in line):
             raise SystemExit(f"{setname}: unhandled ROM statement: {line.strip()}")
     return segs
 
 
-def place(segs, setname, swimmer=False, tangramq=False, yamato=False):
+def place(segs, setname, swimmer=False, tangramq=False, yamato=False, toprollr=False):
     out = []
     for s in segs:
         if s["region"] in IGNORED_REGIONS:
+            continue
+        if toprollr:
+            hit = toprollr_region(s["region"], s["dst"])
+            if hit is None:
+                raise SystemExit(f"{setname}: unmapped region {s['region']} @ 0x{s['dst']:X}")
+            out.append(dict(s, addr=hit))
             continue
         if tangramq or yamato:
             table = TANGRAMQ_REGIONS if tangramq else YAMATO_REGIONS
@@ -264,7 +358,7 @@ def flags_for(g, segs):
         f |= F_DECRYPT
     f |= XOR.get(g["init"], 0)
     layout = LAYOUT_BY_INPUT[g["inputs"]]
-    if layout in (LAYOUT_CKONG, LAYOUT_CANNONB):
+    if layout in (LAYOUT_CKONG, LAYOUT_CANNONB, LAYOUT_TOPROLLR):
         f |= F_VOL5                                    # Falcon redraw shows the D4 resistor fitted
     if g["rot"] in ("ROT90", "ROT270"):
         f |= F_VERT
@@ -292,7 +386,10 @@ def mra(g, games, segs):
     rom_index = rom_index_for(g)
     v = variant_for(g)
     variant = f" {v:02X}" if v is not None else ""
-    if rom_index == 6:
+    if rom_index == 7:
+        index0 = ("banks 0x0000 (3 x 16K), fixed 4000-5FFF 0xC000, CPU C000-FFFF 0x10000, tiles 0x14000, "
+                  "big sprite 0x18000, bg 0x1C000, samples 0x1E000, PROMs 0x20000")
+    elif rom_index == 6:
         index0 = ("CPU 0x0000, tiles 0x8000, big sprite 0xC000, sound CPU 0xE000, gradient 0x10000, "
                   "palette PROMs 0x12000")
     elif rom_index == 5:
@@ -302,7 +399,8 @@ def mra(g, games, segs):
                   "big sprite 0x12000" + (", palette PROMs 0x15000" if any(s["region"] == "proms" for s in segs) else ""))
     else:
         index0 = ("CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000"
-                  + (", decryption PROM 0xD100" if has_dprom else ""))
+                  + (", decryption PROM 0xD100" if has_dprom else "")
+                  + (", speech PROM 0xD200, speech ROMs 0xE000" if any(s["region"] == "speech" for s in segs) else ""))
 
     lines = []
     pos = 0
@@ -358,7 +456,7 @@ def mra(g, games, segs):
     <rom index="1">
         <part>{layout:02X} {flags:02X}{variant}</part>
     </rom>
-
+{hiscore_xml(g)}
     <remark>{remark(g)}</remark>
     <mratimestamp>20260927000000</mratimestamp>
 </misterromdescription>
@@ -414,7 +512,7 @@ def main():
     for name in sys.argv[3:]:
         g = games[name]
         segs = place(parse_roms(src, name), name, g["machine"] in SWIMMER_MACHINES, g["machine"] == "tangramq",
-                     g["machine"] == "yamato")
+                     g["machine"] == "yamato", g["machine"] == "toprollr")
         path = out_path(out_dir, g, games)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(mra(g, games, segs))

@@ -1,0 +1,73 @@
+<misterromdescription>
+    <name>Top Roller</name>
+    <region>World</region>
+    <homebrew>no</homebrew>
+    <bootleg>no</bootleg>
+    <version></version>
+    <alternative></alternative>
+    <platform></platform>
+    <series>Top Roller</series>
+    <year>1983</year>
+    <manufacturer>Jaleco</manufacturer>
+    <category>Driving</category>
+
+    <setname>toprollr</setname>
+    <parent>toprollr</parent>
+    <mameversion>0289</mameversion>
+    <rbf>CrazyClimber</rbf>
+    <about></about>
+
+    <resolution>15kHz</resolution>
+    <rotation>vertical (cw)</rotation>
+    <flip>no</flip>
+
+    <players>2 (alternating)</players>
+    <joystick>4-way</joystick>
+    <special_controls></special_controls>
+    <num_buttons>1</num_buttons>
+    <buttons names="Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,Y,B,X,Select,Start,R,L"/>
+
+    <switches default="80,00">
+        <dip name="Lives" bits="0,1" ids="3,4,5,6"/>
+        <dip name="Coin A" bits="2,4" ids="1C/1C,2C/1C,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play"/>
+        <dip name="Bonus Life" bits="5" ids="Every 30000,Every 50000"/>
+        <dip name="Difficulty" bits="6" ids="Easy,Hard"/>
+        <dip name="Cabinet" bits="7" ids="Cocktail,Upright"/>
+        <dip name="Coin B" bits="8,10" ids="1C/1C,Invalid,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play"/>
+    </switches>
+
+    <!-- Index 7: banks 0x0000 (3 x 16K), fixed 4000-5FFF 0xC000, CPU C000-FFFF 0x10000, tiles 0x14000, big sprite 0x18000, bg 0x1C000, samples 0x1E000, PROMs 0x20000 -->
+    <rom index="7" md5="none" zip="toprollr.zip">
+        <part crc="ef789f00" name="2.f5"/>
+        <part crc="94371cfb" name="8.f3"/>
+        <part crc="d45494ba" name="3.h5"/>
+        <part crc="8a8032a7" name="9.h3"/>
+        <part crc="9894374d" name="1.d5"/>
+        <part crc="904fffb6" name="7.d3"/>
+        <part crc="1cb48ea0" name="4.k5"/>
+        <part repeat="0x2000">00</part>
+        <part crc="1e8914a6" name="10.k3"/>
+        <part crc="b20a9fa2" name="11.l3"/>
+        <part crc="ce3afe26" name="16.j4"/>
+        <part crc="b6fe97f2" name="15.h4"/>
+        <part crc="7a945733" name="14.c4"/>
+        <part crc="89327329" name="13.a4"/>
+        <part crc="e30c1dd8" name="6.m5"/>
+        <part crc="84139f46" name="5.l5"/>
+        <part crc="7f989dc9" name="12.p3"/>
+        <part crc="42e828fa" name="prom.p2"/>
+        <part crc="99b87eed" name="prom.r2"/>
+        <part crc="7d626d6c" name="prom.a1"/>
+        <part crc="eb399c02" name="prom.p9"/>
+        <part crc="fb03ea99" name="prom.n9"/>
+        <part crc="abf4c5fb" name="prom.s9"/>
+    </rom>
+
+    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <rom index="1">
+        <part>07 98 20</part>
+    </rom>
+
+    <remark>Top Roller (Jaleco)</remark>
+    <mratimestamp>20260927000000</mratimestamp>
+</misterromdescription>

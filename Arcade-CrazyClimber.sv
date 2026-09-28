@@ -37,6 +37,9 @@ wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire [10:0] ps2_key;
 wire        ioctl_download;
+wire        ioctl_upload;
+wire        ioctl_upload_req;
+wire  [7:0] ioctl_din;
 wire        ioctl_wr;
 wire  [7:0] ioctl_index;
 wire [24:0] ioctl_addr;
@@ -77,13 +80,13 @@ assign BUTTONS = 0;
 ///////////////////////////////////////////////////
 
 // MRA index 1: byte 0 = control layout, byte 1 = board flags
-//   layout: 0 Crazy Climber twin stick, 1 Crazy Kong, 2 River Patrol, 3 Swimmer / Guzzler, 4 Cannon Ball, 5 Tangram Q, 6 Yamato
-// ROM images: index 0 CC board, 2 Swimmer board, 5 Tangram Q, 6 Yamato; 3 and 4 are reserved for hiscore config / NVRAM
+//   layout: 0 Crazy Climber twin stick, 1 Crazy Kong, 2 River Patrol, 3 Swimmer / Guzzler, 4 Cannon Ball, 5 Tangram Q, 6 Yamato, 7 Top Roller
+// ROM images: index 0 CC board, 2 Swimmer board, 5 Tangram Q, 6 Yamato, 7 Top Roller; 3 and 4 are reserved for hiscore config / NVRAM
 //   flags : [0] decryption PROM, [2:1] ROM XOR mode, [3] volume D4 fitted, [4] vertical (ROT270),
 //           [5] latch Q3 drives the NMI mask, [6] Swimmer board (ROMs on index 2), [7] vertical is ROT90
 reg [7:0] game_layout = 8'd0;
 reg [7:0] game_flags  = 8'd1;
-reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au, [1] Cannon Ball board, [2] Cannon Ball ROM XOR, [3] Tangram Q, [4] Yamato
+reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au, [1] Cannon Ball board, [2] Cannon Ball ROM XOR, [3] Tangram Q, [4] Yamato, [5] Top Roller, [6] Le Bagnard
 
 always @(posedge CLK_49M) begin
 	if (ioctl_wr && ioctl_index == 8'd1) begin
@@ -115,6 +118,9 @@ localparam CONF_STR = {
 	"P2OP,Pause when OSD is open,On,Off;",
 	"P2OQ,Dim video after 10s,On,Off;",
 	"-;",
+	"P3,High Score Options;",
+	"P3OR,Autosave Hiscores,Off,On;",
+	"-;",
 	"DIP;",
 	"-;",
 	"R0,Reset;",
@@ -139,9 +145,12 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.status_menumask({direct_video}),
 
 	.ioctl_download(ioctl_download),
+	.ioctl_upload(ioctl_upload),
+	.ioctl_upload_req(ioctl_upload_req),
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
+	.ioctl_din(ioctl_din),
 	.ioctl_index(ioctl_index),
 
 	.joystick_0(joystick_0),
@@ -299,6 +308,11 @@ always @(*) begin
 	in_sys1 = 8'hFF;
 	in_sys2 = 8'hFF;
 	case (game_layout)
+		8'd7: begin // Top Roller: P1 bits 0-2 are the Coin B switches; SYSTEM active low
+			in_p1  = {m_right1, m_left1, m_down1, m_up1, m_b1_1, dip_sw[1][2:0]};
+			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b1_2, 3'b000};
+			in_sys = {4'hF, ~m_start2, ~m_start1, ~m_coin1, ~m_coin2};
+		end
 		8'd6: begin // Yamato: 8-way + 2 buttons; the US set reads its Coin B switches (DSW2) through P1/P2 bits 0-1
 			in_p1  = {m_right1, m_left1, m_down1, m_up1, m_b2_1, m_b1_1, dip_sw[1][1:0]};
 			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b2_2, m_b1_2, dip_sw[1][3:2]};
@@ -349,7 +363,7 @@ pause #(8,8,8,49) pause
 	.*,
 	.clk_sys(CLK_49M),
 	.user_button(m_pause),
-	.pause_request(1'b0),
+	.pause_request(hs_pause),
 	.options(~status[26:25])
 );
 
@@ -397,6 +411,8 @@ cclimber_board board
 	.cb_xor(game_var[2]),
 	.tangramq(game_var[3]),
 	.yamato(game_var[4]),
+	.toprollr(game_var[5]),
+	.bagmanf(game_var[6]),
 	.decrypt_en(game_flags[0]),
 	.rom_xor(game_flags[2:1]),
 	.vol5_en(game_flags[3]),
@@ -415,6 +431,7 @@ cclimber_board board
 	.ioctl_wr2(ioctl_wr & (ioctl_index == 8'd2)),
 	.ioctl_wr5(ioctl_wr & (ioctl_index == 8'd5)),
 	.ioctl_wr6(ioctl_wr & (ioctl_index == 8'd6)),
+	.ioctl_wr7(ioctl_wr & (ioctl_index == 8'd7)),
 
 	.video_r(r),
 	.video_g(g),
@@ -430,7 +447,44 @@ cclimber_board board
 	.flip_x(flip_x),
 	.flip_y(flip_y),
 
-	.audio(audio)
+	.audio(audio),
+
+	.hs_address(hs_address),
+	.hs_data_in(hs_data_in),
+	.hs_data_out(hs_data_out),
+	.hs_write(hs_write_enable)
+);
+
+// HISCORE SYSTEM - config = MRA index 3, dump = index 4 (MAME hiscore.dat, CPU addresses).
+// The board gives the module a second port on the work RAMs and video RAM, used while it holds the CPU paused.
+wire [15:0] hs_address;
+wire  [7:0] hs_data_in;
+wire  [7:0] hs_data_out;
+wire        hs_write_enable;
+wire        hs_access_read;
+wire        hs_access_write;
+wire        hs_pause;
+wire        hs_configured;
+
+hiscore #(
+	.HS_ADDRESSWIDTH(16),
+	.CFG_ADDRESSWIDTH(4),
+	.CFG_LENGTHWIDTH(2)
+) hi (
+	.*,
+	.clk(CLK_49M),
+	.paused(pause_cpu),
+	.autosave(status[27]),
+	.ram_address(hs_address),
+	.data_from_ram(hs_data_out),
+	.data_to_ram(hs_data_in),
+	.data_from_hps(ioctl_dout),
+	.data_to_hps(ioctl_din),
+	.ram_write(hs_write_enable),
+	.ram_intent_read(hs_access_read),
+	.ram_intent_write(hs_access_write),
+	.pause_cpu(hs_pause),
+	.configured(hs_configured)
 );
 
 endmodule

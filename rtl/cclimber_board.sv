@@ -24,6 +24,8 @@ module cclimber_board
     input               cb_xor,         // Cannon Ball set 1: first program ROM XORed by address
     input               tangramq,       // Tangram Q: SYSTEM ports at 8000/8020, SNK sound board, 4K big sprite planes
     input               yamato,         // Yamato: Sega 315-5018 CPU, 12-bit palette, gradient background, polled sound board
+    input               toprollr,       // Top Roller: banked 315-5018 CPU, extra bg layer, 56 sprites (toprollr_video.sv)
+    input               bagmanf,        // Le Bagnard: CK board rewired to Bagman's map, per-tile colour RAM, IRQ, TMS5110 speech
     input               decrypt_en,     // dm7052 opcode decryption PROM fitted
     input         [1:0] rom_xor,        // 0 none, 1 rpatrol, 2 ckongb, 3 dking
     input               vol5_en,        // volume D4 resistor fitted
@@ -42,6 +44,7 @@ module cclimber_board
     input               ioctl_wr2,      // ioctl index 2 (Swimmer layout)
     input               ioctl_wr5,      // ioctl index 5 (Tangram Q layout)
     input               ioctl_wr6,      // ioctl index 6 (Yamato layout)
+    input               ioctl_wr7,      // ioctl index 7 (Top Roller layout)
 
     output        [7:0] video_r,
     output        [7:0] video_g,
@@ -57,13 +60,19 @@ module cclimber_board
     output              flip_x,
     output              flip_y,
 
-    output signed [15:0] audio
+    output signed [15:0] audio,
+
+    // hiscore: second port on the work RAMs and video RAM (CPU addresses)
+    input        [15:0] hs_address,
+    input         [7:0] hs_data_in,
+    output        [7:0] hs_data_out,
+    input               hs_write
 );
 
 //------------------------------------------------------- ROM load map --------------------------------------------------------//
 
 // Layouts in rtl/ram_rom/rom_loader.sv
-wire prog_cs, tile0_cs, tile1_cs, bs0_cs, bs1_cs, smp_cs, pal_cs, bspal_cs, dprom_cs;
+wire prog_cs, tile0_cs, tile1_cs, bs0_cs, bs1_cs, smp_cs, pal_cs, bspal_cs, dprom_cs, sprom_cs, spch_cs;
 
 selector rom_sel
 (
@@ -76,7 +85,9 @@ selector rom_sel
     .smp_cs(smp_cs),
     .pal_cs(pal_cs),
     .bspal_cs(bspal_cs),
-    .dprom_cs(dprom_cs)
+    .dprom_cs(dprom_cs),
+    .sprom_cs(sprom_cs),
+    .spch_cs(spch_cs)
 );
 
 wire       sw_prog_cs, sw_himem_cs, sw_snd_cs, sw_pal_lo_cs, sw_pal_hi_cs, sw_bspal_cs;
@@ -136,25 +147,53 @@ wire dl_ym_grad0 = ioctl_wr6 & ym_grad0_cs;
 wire dl_ym_grad1 = ioctl_wr6 & ym_grad1_cs;
 wire dl_ym_pal_b = ioctl_wr6 & ym_pal_b_cs;
 
-wire dl_prog   = (ioctl_wr0 & prog_cs) | (ioctl_wr2 & sw_prog_cs) | (ioctl_wr5 & tq_prog_cs) | (ioctl_wr6 & ym_prog_cs);
+wire tr_bank_cs, tr_prog_cs, tr_tile0_cs, tr_tile1_cs, tr_bs0_cs, tr_bs1_cs, tr_bg0_cs, tr_bg1_cs, tr_smp_cs, tr_pal_cs;
+
+selector_toprollr rom_sel_tr
+(
+    .ioctl_addr(ioctl_addr),
+    .bank_cs(tr_bank_cs),
+    .prog_cs(tr_prog_cs),
+    .tile0_cs(tr_tile0_cs),
+    .tile1_cs(tr_tile1_cs),
+    .bs0_cs(tr_bs0_cs),
+    .bs1_cs(tr_bs1_cs),
+    .bg0_cs(tr_bg0_cs),
+    .bg1_cs(tr_bg1_cs),
+    .smp_cs(tr_smp_cs),
+    .pal_cs(tr_pal_cs)
+);
+
+wire dl_tr_bank = ioctl_wr7 & tr_bank_cs;
+wire dl_tr_pal  = ioctl_wr7 & tr_pal_cs;
+
+wire dl_prog   = (ioctl_wr0 & prog_cs) | (ioctl_wr2 & sw_prog_cs) | (ioctl_wr5 & tq_prog_cs) | (ioctl_wr6 & ym_prog_cs) |
+                 (ioctl_wr7 & tr_prog_cs);
 wire dl_himem  = ioctl_wr2 & sw_himem_cs;
 wire dl_snd    = ioctl_wr2 & sw_snd_cs;
-wire dl_tile0  = (ioctl_wr0 & tile0_cs) | (ioctl_wr2 & sw_tile_cs[0]) | (ioctl_wr5 & tq_tile0_cs) | (ioctl_wr6 & ym_tile0_cs);
-wire dl_tile1  = (ioctl_wr0 & tile1_cs) | (ioctl_wr2 & sw_tile_cs[1]) | (ioctl_wr5 & tq_tile1_cs) | (ioctl_wr6 & ym_tile1_cs);
+wire dl_tile0  = (ioctl_wr0 & tile0_cs) | (ioctl_wr2 & sw_tile_cs[0]) | (ioctl_wr5 & tq_tile0_cs) | (ioctl_wr6 & ym_tile0_cs) |
+                 (ioctl_wr7 & tr_tile0_cs);
+wire dl_tile1  = (ioctl_wr0 & tile1_cs) | (ioctl_wr2 & sw_tile_cs[1]) | (ioctl_wr5 & tq_tile1_cs) | (ioctl_wr6 & ym_tile1_cs) |
+                 (ioctl_wr7 & tr_tile1_cs);
 wire dl_tile2  = ioctl_wr2 & sw_tile_cs[2];
-wire dl_bs0    = (ioctl_wr0 & bs0_cs) | (ioctl_wr2 & sw_bs_cs[0]) | (ioctl_wr5 & tq_bs0_cs) | (ioctl_wr6 & ym_bs0_cs);
-wire dl_bs1    = (ioctl_wr0 & bs1_cs) | (ioctl_wr2 & sw_bs_cs[1]) | (ioctl_wr5 & tq_bs1_cs) | (ioctl_wr6 & ym_bs1_cs);
+wire dl_bs0    = (ioctl_wr0 & bs0_cs) | (ioctl_wr2 & sw_bs_cs[0]) | (ioctl_wr5 & tq_bs0_cs) | (ioctl_wr6 & ym_bs0_cs) |
+                 (ioctl_wr7 & tr_bs0_cs);
+wire dl_bs1    = (ioctl_wr0 & bs1_cs) | (ioctl_wr2 & sw_bs_cs[1]) | (ioctl_wr5 & tq_bs1_cs) | (ioctl_wr6 & ym_bs1_cs) |
+                 (ioctl_wr7 & tr_bs1_cs);
 wire dl_bs2    = ioctl_wr2 & sw_bs_cs[2];
-wire dl_smp    = ioctl_wr0 & smp_cs;
+wire dl_smp    = (ioctl_wr0 & smp_cs) | (ioctl_wr7 & tr_smp_cs);
 wire dl_pal    = (ioctl_wr0 & pal_cs) | (ioctl_wr5 & tq_pal_cs) | (ioctl_wr6 & ym_pal_rg_cs);
 wire dl_pal_lo = ioctl_wr2 & sw_pal_lo_cs;
 wire dl_pal_hi = ioctl_wr2 & sw_pal_hi_cs;
 wire dl_bspal  = (ioctl_wr0 & bspal_cs) | (ioctl_wr2 & sw_bspal_cs) | (ioctl_wr5 & tq_bspal_cs) | (ioctl_wr6 & ym_bspal_cs);
 wire dl_dprom  = ioctl_wr0 & dprom_cs;
+wire dl_sprom  = ioctl_wr0 & sprom_cs;
+wire dl_spch   = ioctl_wr0 & spch_cs;
 
 // Plane RAM addresses: tile slots are 8K on both indexes, big sprite planes 2K (index 0) / 4K (index 2)
 wire [12:0] dl_tile_addr = ioctl_addr[12:0];
-wire [11:0] dl_bs_addr   = (ioctl_wr2 | ioctl_wr5 | ioctl_wr6) ? ioctl_addr[11:0] : {1'b0, ioctl_addr[10:0]};
+wire [12:0] dl_bs_addr   = ioctl_wr7 ? ioctl_addr[12:0] :
+                           (ioctl_wr2 | ioctl_wr5 | ioctl_wr6) ? {1'b0, ioctl_addr[11:0]} : {2'b00, ioctl_addr[10:0]};
 
 //------------------------------------------------------- Video timing --------------------------------------------------------//
 
@@ -227,6 +266,7 @@ wire  [7:0] cpu_do;
 reg   [7:0] cpu_di;
 wire        cpu_m1_n, cpu_mreq_n, cpu_iorq_n, cpu_rd_n, cpu_wr_n;
 reg         cpu_nmi_n = 1'b1;
+reg         cpu_int_n = 1'b1;
 
 T80s #(.Mode(0), .T2Write(1), .IOWait(1)) z80
 (
@@ -234,7 +274,7 @@ T80s #(.Mode(0), .T2Write(1), .IOWait(1)) z80
     .CLK(clk),
     .CEN(cpu_rise & ~pause),
     .WAIT_n(1'b1),
-    .INT_n(1'b1),
+    .INT_n(cpu_int_n),
     .NMI_n(cpu_nmi_n),
     .BUSRQ_n(1'b1),
     .M1_n(cpu_m1_n),
@@ -257,7 +297,8 @@ wire       mem_wr   = ~cpu_mreq_n & ~cpu_wr_n;
 wire [4:0] a_hi     = cpu_addr[15:11];
 
 // CC: ROM 0000-5FFF, RAM 6000-6FFF.  Swimmer: ROM 0000-7FFF + E000-FFFF, RAM C000-CFFF (Guzzler)
-wire rom_cs   = swimmer ? (~cpu_addr[15] | (cpu_addr[15:13] == 3'b111)) :
+wire rom_cs   = toprollr ? ((cpu_addr < 16'h6000) | (cpu_addr[15:14] == 2'b11)) :
+                swimmer ? (~cpu_addr[15] | (cpu_addr[15:13] == 3'b111)) :
                 yamato  ? ((cpu_addr < 16'h6000) | (cpu_addr[15:12] == 4'h7)) : (cpu_addr < 16'h6000);
 wire ram6_cs  = cpu_addr[15:12] == (swimmer ? 4'hC : 4'h6);
 wire ram8_cs  = a_hi == 5'b10000;                                   // 8000-87FF
@@ -282,7 +323,7 @@ dpram_dc #(.widthad_a(15)) prog_rom
     .wren_a(dl_prog),
 
     .clock_b(clk),
-    .address_b(cpu_addr[14:0]),
+    .address_b(toprollr ? {1'b0, cpu_addr[13:0]} : cpu_addr[14:0]),   // Top Roller: C000-FFFF
     .q_b(rom_lo_do)
 );
 
@@ -298,7 +339,24 @@ dpram_dc #(.widthad_a(13)) prog_rom_hi
     .q_b(rom_hi_do)
 );
 
-wire [7:0] rom_do = cpu_addr[15] ? rom_hi_do : rom_lo_do;
+// Top Roller: 0000-3FFF from bank {Q6,Q5}, 4000-5FFF fixed (the slice MAME ROM_COPYs into every bank), C000-FFFF plain
+wire [7:0]  tr_bank_do;
+wire [15:0] tr_bank_addr = {(cpu_addr[14] ? 2'b11 : {mainlatch[6], mainlatch[5]}), cpu_addr[13:0]};
+
+dpram_dc #(.widthad_a(16)) tr_bank_rom
+(
+    .clock_a(clk),
+    .address_a(ioctl_addr[15:0]),
+    .data_a(ioctl_dout),
+    .wren_a(dl_tr_bank),
+
+    .clock_b(clk),
+    .address_b(tr_bank_addr),
+    .q_b(tr_bank_do)
+);
+
+wire tr_banked = toprollr & (cpu_addr < 16'h6000);
+wire [7:0] rom_do = tr_banked ? tr_bank_do : toprollr ? rom_lo_do : cpu_addr[15] ? rom_hi_do : rom_lo_do;
 
 // Bootleg data-bus inverters (MAME init_rpatrol / init_ckongb / init_dking)
 reg [7:0] rom_xor_mask;
@@ -342,52 +400,79 @@ sega_315_5018 dec_5018
     .dout(rom_5018)
 );
 
-wire [7:0] rom_data = yamato ? rom_5018 : (decrypt_en & ~cpu_m1_n) ? rom_dec : rom_src;
+// Top Roller: only the banked window is encrypted, table row from the address within the bank (= CPU address)
+wire [7:0] rom_data = (yamato | tr_banked) ? rom_5018 : (decrypt_en & ~cpu_m1_n) ? rom_dec : rom_src;
 
 //------------------------------------------------------- Work RAM ------------------------------------------------------------//
 
 wire [7:0] ram6_do, ram8_do;
 
-spram #(.DATA_WIDTH(8), .ADDR_WIDTH(12)) ram6
+// hiscore port B: 6000/C000 work RAM, 8000 RAM, 9000 video RAM
+wire       hs_ram6 = hs_address[15:12] == 4'h6 || hs_address[15:12] == 4'hC;
+wire       hs_ram8 = hs_address[15:11] == 5'b10000;
+wire       hs_tile = hs_address[15:11] == 5'b10010;
+reg  [1:0] hs_sel = 2'd0;
+wire [7:0] hs_ram6_do, hs_ram8_do, hs_tile_do;
+always_ff @(posedge clk) hs_sel <= hs_ram6 ? 2'd0 : hs_ram8 ? 2'd1 : 2'd2;
+assign hs_data_out = (hs_sel == 2'd0) ? hs_ram6_do : (hs_sel == 2'd1) ? hs_ram8_do : hs_tile_do;
+
+dpram_dc #(.widthad_a(12)) ram6
 (
-    .clk(clk),
-    .addr(cpu_addr[11:0]),
-    .data(cpu_do),
-    .q(ram6_do),
-    .we(mem_wr & ram6_cs)
+    .clock_a(clk),
+    .address_a(cpu_addr[11:0]),
+    .data_a(cpu_do),
+    .wren_a(mem_wr & ram6_cs),
+    .q_a(ram6_do),
+
+    .clock_b(clk),
+    .address_b(hs_address[11:0]),
+    .data_b(hs_data_in),
+    .wren_b(hs_write & hs_ram6),
+    .q_b(hs_ram6_do)
 );
 
 // CC: 1K mirrored through 8000-87FF.  Swimmer: 2K
-spram #(.DATA_WIDTH(8), .ADDR_WIDTH(11)) ram8
+dpram_dc #(.widthad_a(11)) ram8
 (
-    .clk(clk),
-    .addr({swimmer & cpu_addr[10], cpu_addr[9:0]}),
-    .data(cpu_do),
-    .q(ram8_do),
-    .we(mem_wr & ram8_cs & ~tangramq)
+    .clock_a(clk),
+    .address_a({swimmer & cpu_addr[10], cpu_addr[9:0]}),
+    .data_a(cpu_do),
+    .wren_a(mem_wr & ram8_cs & ~tangramq),
+    .q_a(ram8_do),
+
+    .clock_b(clk),
+    .address_b({swimmer & hs_address[10], hs_address[9:0]}),
+    .data_b(hs_data_in),
+    .wren_b(hs_write & hs_ram8 & ~tangramq),
+    .q_b(hs_ram8_do)
 );
 
 //------------------------------------------------------- CPU read mux --------------------------------------------------------//
 
 wire [7:0] ay_dout;
 wire [7:0] bs_ram_do, tile_ram_do, color_ram_do;
+wire [7:0] tr_cpu_di;
+wire       tr_cpu_sel;
 
 always_comb begin
     if (~cpu_iorq_n)
-        cpu_di = (swimmer | yamato) ? 8'hFF : ay_dout;
+        cpu_di = (~cpu_m1_n | swimmer | yamato) ? 8'hFF : ay_dout;   // interrupt acknowledge reads FF (RST 38)
+    else if (toprollr && tr_cpu_sel)
+        cpu_di = tr_cpu_di;
     else if (rom_cs)
         cpu_di = rom_data;
     else if (ram6_cs)
         cpu_di = ram6_do;
     else case (a_hi)
-        5'b10000: cpu_di = tangramq ? (cpu_addr[5] ? in_sys2 : in_sys1) : ram8_do;
-        5'b10001: cpu_di = cannonb ? 8'h00 : bs_ram_do;   // Cannon Ball big sprite RAM is write-only
+        5'b10000: cpu_di = bagmanf ? in_p1 : tangramq ? (cpu_addr[5] ? in_sys2 : in_sys1) : ram8_do;
+        5'b10001: cpu_di = (bagmanf && cpu_addr[10:0] == 11'd0) ? in_p2 :
+                           cannonb ? 8'h00 : bs_ram_do;   // Cannon Ball big sprite RAM is write-only
         5'b10010: cpu_di = tile_ram_do;
-        5'b10011: cpu_di = color_ram_do;
-        5'b10100: cpu_di = in_p1;
-        5'b10101: cpu_di = in_p2;
+        5'b10011: cpu_di = (bagmanf && cpu_addr[10:0] == 11'd0) ? in_sys : color_ram_do;
+        5'b10100: cpu_di = bagmanf ? 8'h3F : in_p1;       // Le Bagnard: MAME returns 0x3F (parent's PAL16R6)
+        5'b10101: cpu_di = bagmanf ? 8'hFF : in_p2;
         5'b10110: cpu_di = in_dsw;
-        5'b10111: cpu_di = in_sys;
+        5'b10111: cpu_di = bagmanf ? 8'hFF : in_sys;
         default:  cpu_di = 8'h00;
     endcase
 end
@@ -409,11 +494,24 @@ always_ff @(posedge clk) begin
 end
 
 // NMI latched at line 224 and held until the mask is cleared
+wire vbl_line = y_tile == 5'b11100 && y_pixel == 3'b000;
 always_ff @(posedge clk) begin
     if (!nmi_en)
         cpu_nmi_n <= 1'b1;
-    else if (ce12 && y_tile == 5'b11100 && y_pixel == 3'b000)
+    else if (ce12 && vbl_line && !bagmanf)
         cpu_nmi_n <= 1'b0;
+end
+
+// Le Bagnard: the mask gates an IRQ instead, held until acknowledged (MAME bagmanf_vblank_irq, HOLD_LINE)
+reg vbl_line_d = 1'b0;
+always_ff @(posedge clk) begin
+    if (ce12) vbl_line_d <= vbl_line;
+    if (reset)
+        cpu_int_n <= 1'b1;
+    else if (~cpu_m1_n & ~cpu_iorq_n)
+        cpu_int_n <= 1'b1;
+    else if (ce12 && vbl_line && !vbl_line_d && nmi_en && bagmanf)
+        cpu_int_n <= 1'b0;
 end
 
 //------------------------------------------------------- Big sprite registers ------------------------------------------------//
@@ -424,7 +522,7 @@ reg [7:0] y_big_sprite = 8'd0;          // ctrl 2
 reg [7:0] x_big_sprite = 8'd0;          // ctrl 3
 
 // CC 98DC-98DF, Swimmer 98FC-98FF
-wire bs_ctrl_cs = cpu_addr[15:2] == (swimmer ? 14'h263F : 14'h2637);
+wire bs_ctrl_cs = cpu_addr[15:2] == (swimmer ? 14'h263F : toprollr ? 14'h2677 : 14'h2637);   // 98FC / 99DC / 98DC
 
 always_ff @(posedge clk) begin
     if (ce12 && mem_wr && bs_ctrl_cs) begin
@@ -453,8 +551,11 @@ end
 
 //------------------------------------------------------- Colour RAM (scroll, sprites, attributes) ----------------------------//
 
-// 9800-9FFF with A5 not connected: scroll at 000-01F, sprites at 040-05F, attributes at 200-3FF
-wire [9:0] cpu_addr_mod = {cpu_addr[10:6], cpu_addr[4:0]};
+// 9800-9FFF with A5 not connected: scroll at 000-01F, sprites at 040-05F, attributes at 200-3FF.
+// Le Bagnard: 9800-9BFF one attribute per character, sprites = its first 32 bytes, no column scroll.
+wire [9:0] cpu_addr_mod = bagmanf ? cpu_addr[9:0] : {cpu_addr[10:6], cpu_addr[4:0]};
+wire [4:0] spr_base     = bagmanf ? 5'b00000 : 5'b00010;
+reg  [7:0] attr_cc = 8'd0;          // Le Bagnard: attribute of the character actually drawn (Y flip pairs)
 
 wire [7:0] y_line_shift;
 
@@ -467,24 +568,30 @@ always_ff @(posedge clk) begin
         color_ram_we <= 1'b0;
         case (x_pixel)
             3'b000: begin
-                color_ram_addr <= is_sprite ? {5'b00010, sprite, 2'b10} : {5'b00000, x_tile_v};
-                if (ena_pixel) y_sp_bg <= color_ram_do;
+                color_ram_addr <= is_sprite ? {spr_base, sprite, 2'b10} : {5'b00000, x_tile_v};
+                if (ena_pixel) y_sp_bg <= ((toprollr | bagmanf) & ~is_sprite) ? 8'd0 : color_ram_do;   // no column scroll
             end
             3'b010: begin
-                color_ram_addr <= is_sprite ? {5'b00010, sprite, 2'b01} : {1'b1, y_line_shift[7:4], x_tile_v};
+                color_ram_addr <= is_sprite ? {spr_base, sprite, 2'b01} :
+                                  bagmanf   ? {y_line_shift[7:3], x_tile_v} : {1'b1, y_line_shift[7:4], x_tile_v};
                 if (ena_pixel) attr_sp_bg <= color_ram_do;
             end
             3'b100: begin
-                color_ram_addr <= is_sprite ? {5'b00010, sprite, 2'b00} : 10'd0;
-                if (ena_pixel) attr_sp <= color_ram_do;
+                // Le Bagnard: Y flip draws the pair's other character with ITS attribute (MAME tile_index ^ 0x20)
+                color_ram_addr <= is_sprite ? {spr_base, sprite, 2'b00} :
+                                  {y_line_shift[7:4], y_line_shift[3] ^ attr_sp_bg[7], x_tile_v};
+                if (ena_pixel) begin
+                    attr_sp <= color_ram_do;
+                    if (~is_sprite) attr_cc <= color_ram_do;
+                end
             end
             3'b110: begin
-                color_ram_addr <= is_sprite ? {5'b00010, sprite, 2'b11} : 10'd0;
+                color_ram_addr <= is_sprite ? {spr_base, sprite, 2'b11} : 10'd0;
                 if (ena_pixel) x_sprite <= color_ram_do;
             end
             default: begin
                 color_ram_addr <= cpu_addr_mod;
-                color_ram_we   <= mem_wr & color_cs;
+                color_ram_we   <= mem_wr & color_cs & ~(bagmanf & cpu_addr[10]);   // Le Bagnard: 9C00-9FFF unused
             end
         endcase
     end
@@ -509,21 +616,27 @@ always_ff @(posedge clk) begin
         tile_ram_we <= 1'b0;
         // Y flip (attr bit 7) swaps the two characters of a row pair, as the pair shares one attribute (MAME tile_index ^ 0x20)
         if (x_pixel == 3'b100)
-            tile_ram_addr <= {y_line_shift[7:4], y_line_shift[3] ^ attr_sp_bg[7], x_tile_v};
+            tile_ram_addr <= {y_line_shift[7:4], y_line_shift[3] ^ (attr_sp_bg[7] & ~toprollr), x_tile_v};
         else begin
             tile_ram_addr <= cpu_addr[9:0];
-            tile_ram_we   <= mem_wr & tile_cs;
+            tile_ram_we   <= mem_wr & tile_cs & ~(toprollr & cpu_addr[10]);   // Top Roller: 9400-97FF is bg colour RAM
         end
     end
 end
 
-spram #(.DATA_WIDTH(8), .ADDR_WIDTH(10)) tile_ram
+dpram_dc #(.widthad_a(10)) tile_ram
 (
-    .clk(clk),
-    .addr(tile_ram_addr),
-    .data(cpu_do),
-    .q(tile_ram_do),
-    .we(tile_ram_we)
+    .clock_a(clk),
+    .address_a(tile_ram_addr),
+    .data_a(cpu_do),
+    .wren_a(tile_ram_we),
+    .q_a(tile_ram_do),
+
+    .clock_b(clk),
+    .address_b(hs_address[9:0]),
+    .data_b(hs_data_in),
+    .wren_b(hs_write & hs_tile),
+    .q_b(hs_tile_do)
 );
 
 //------------------------------------------------------- Tile / sprite graphics ----------------------------------------------//
@@ -554,9 +667,10 @@ end
 
 // Code bank bits: CC {attr4, attr5}; Swimmer attr4 only (4K planes, 512 chars / 128 sprites); Au {attr5, attr4};
 // Cannon Ball: chars in the first 4K of each plane (attr5 = code bit 8), 64 sprites in the second 4K
+wire [7:0] attr_cd = (bagmanf & ~is_sprite) ? attr_cc : attr_sp_bg;
 wire [1:0] code_hi = au      ? {attr_sp_bg[5], attr_sp_bg[4]} :
                      swimmer ? {1'b0, attr_sp_bg[4]} :
-                     cannonb ? (is_sprite ? 2'b10 : {1'b0, attr_sp_bg[5]}) : {attr_sp_bg[4], attr_sp_bg[5]};
+                     cannonb ? (is_sprite ? 2'b10 : {1'b0, attr_sp_bg[5]}) : {attr_cd[4], attr_cd[5]};
 
 always_ff @(posedge clk) begin
     if (ce12) begin
@@ -569,12 +683,12 @@ always_ff @(posedge clk) begin
                                             {y_line_shift[3], x_tile[0], y_line_shift[2:0]} ^ sp_row_xor};
                 else
                     tile_graph_rom_addr <= {code_hi, bg_tile_code,
-                                            attr_sp_bg[7] ? ~y_line_shift[2:0] : y_line_shift[2:0]};
+                                            (attr_sp_bg[7] & ~toprollr) ? ~y_line_shift[2:0] : y_line_shift[2:0]};
             end
 
             3'b111: if (ena_pixel) begin
-                tile_color_r <= {pal_bank, attr_sp_bg[3:0]};
-                if ((is_sprite & attr_sp[6]) | (~is_sprite & attr_sp_bg[6])) begin
+                tile_color_r <= {pal_bank, attr_cd[3:0]};
+                if ((is_sprite & attr_sp[6]) | (~is_sprite & attr_sp_bg[6] & ~toprollr)) begin
                     tile_graph1_r <= bitrev8(tile_rom0_do);
                     tile_graph2_r <= bitrev8(tile_rom1_do);
                     tile_graph3_r <= bitrev8(tile_rom2_do);
@@ -584,7 +698,7 @@ always_ff @(posedge clk) begin
                     tile_graph3_r <= tile_rom2_do;
                 end
                 is_sprite_r <= is_sprite;
-                keep_sprite <= (y_line_shift[7:4] == 4'b1111) && (x_sprite != 8'h00) && (y_sp_bg != 8'h00);
+                keep_sprite <= (y_line_shift[7:4] == 4'b1111) && (x_sprite != 8'h00) && (y_sp_bg != 8'h00) && !toprollr;
             end
 
             default: ;
@@ -700,9 +814,13 @@ reg        bs_vis_addr = 1'b0, bs_vis_code = 1'b0, bs_vis_r = 1'b0, bs_vis_g = 1
 reg  [7:0] bs_vis_d = 8'd0;
 wire [7:0] bs_rom0_do, bs_rom1_do, bs_rom2_do;
 
+// Top Roller: ctrl bits 4/5 are code bit 9 / priority, and the big sprite follows the screen flip (MAME toprollr_draw_bigsprite)
+wire bs_fx = toprollr ? hinv : attr_big_sprite[4];
+wire bs_fy = toprollr ? 1'b0 : attr_big_sprite[5];
+
 reg [7:0] xy_big_sprite;
 always_comb begin
-    case (attr_big_sprite[5:4])
+    case ({bs_fy, bs_fx})
         2'b01:   xy_big_sprite = { y_line_bs[6:3], ~x_bs_cnt[6:3]};
         2'b11:   xy_big_sprite = {~y_line_bs[6:3], ~x_bs_cnt[6:3]};
         2'b00:   xy_big_sprite = { y_line_bs[6:3],  x_bs_cnt[6:3]};
@@ -710,9 +828,9 @@ always_comb begin
     endcase
 end
 
-// Ctrl bit 3 is tile code bit 8; only the 4K planes (Swimmer board, Tangram Q, Yamato) are deep enough to use it
-wire [11:0] bs_rom_addr = {(swimmer | tangramq | yamato) & attr_big_sprite[3], bs_tile_code_r,
-                           attr_big_sprite[5] ? ~y_line_bs[2:0] : y_line_bs[2:0]};
+// Ctrl bit 3 is tile code bit 8 on the 4K planes (Swimmer board, Tangram Q, Yamato); Top Roller adds bit 4 = code bit 9
+wire [1:0]  bs_bank     = toprollr ? attr_big_sprite[4:3] : {1'b0, (swimmer | tangramq | yamato) & attr_big_sprite[3]};
+wire [12:0] bs_rom_addr = {bs_bank, bs_tile_code_r, bs_fy ? ~y_line_bs[2:0] : y_line_bs[2:0]};
 
 always_ff @(posedge clk) begin
     if (ce12) begin
@@ -751,14 +869,14 @@ always_ff @(posedge clk) begin
             bs_tile_code_r <= bs_tile_code;
             bs_vis_r       <= bs_vis_code;
             bs_vis_g       <= bs_vis_r;
-            bs_graph1      <= attr_big_sprite[4] ? bs_rom0_do : bitrev8(bs_rom0_do);
-            bs_graph2      <= attr_big_sprite[4] ? bs_rom1_do : bitrev8(bs_rom1_do);
-            bs_graph3      <= attr_big_sprite[4] ? bs_rom2_do : bitrev8(bs_rom2_do);
+            bs_graph1      <= bs_fx ? bs_rom0_do : bitrev8(bs_rom0_do);
+            bs_graph2      <= bs_fx ? bs_rom1_do : bitrev8(bs_rom1_do);
+            bs_graph3      <= bs_fx ? bs_rom2_do : bitrev8(bs_rom2_do);
         end
     end
 end
 
-dpram_dc #(.widthad_a(12)) bs_rom0
+dpram_dc #(.widthad_a(13)) bs_rom0
 (
     .clock_a(clk),
     .address_a(dl_bs_addr),
@@ -770,7 +888,7 @@ dpram_dc #(.widthad_a(12)) bs_rom0
     .q_b(bs_rom0_do)
 );
 
-dpram_dc #(.widthad_a(12)) bs_rom1
+dpram_dc #(.widthad_a(13)) bs_rom1
 (
     .clock_a(clk),
     .address_a(dl_bs_addr),
@@ -782,7 +900,7 @@ dpram_dc #(.widthad_a(12)) bs_rom1
     .q_b(bs_rom1_do)
 );
 
-dpram_dc #(.widthad_a(12)) bs_rom2
+dpram_dc #(.widthad_a(13)) bs_rom2
 (
     .clock_a(clk),
     .address_a(dl_bs_addr),
@@ -817,7 +935,7 @@ always_ff @(posedge clk) begin
     if (ce12) begin
         bs_pixel_color_r <= bs_pixel_color;
         bs_pixel_vis_r   <= bs_vis_d[bs_sel];
-        is_big_sprite_on <= pix_on(swimmer, {2'b00, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r;
+        is_big_sprite_on <= pix_on(swimmer, {2'b00, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r && !bagmanf;   // Le Bagnard: no big sprite ROM
     end
 end
 
@@ -836,6 +954,63 @@ always_ff @(posedge clk) begin
 end
 
 // Yamato: third/fourth PROMs carry the blue nibble of the 12-bit character pens
+// Top Roller: five 32x8 PROMs = 0xA0 pens (fg/sprites 00, big sprite 40, bg 60), CC-style resistor DAC (board photo)
+reg [7:0] pal_tr [160];
+always_ff @(posedge clk) if (dl_tr_pal && ioctl_addr[7:0] < 8'hA0) pal_tr[ioctl_addr[7:0]] <= ioctl_dout;
+
+wire [5:0] tr_spr_pen, tr_bg_pen;
+wire       tr_spr_on, tr_clip;
+
+toprollr_video #(.X_START(8'd0), .Y_OFS(8'd1)) tr_video
+(
+    .clk(clk),
+    .ce_px(ce_px),
+    .hblank(video_hblank),
+    .line_y(vcnt_r[7:0]),
+    .flip_x(hinv),
+    .flip_y(vinv),
+
+    .cpu_addr(cpu_addr),
+    .cpu_do(cpu_do),
+    .cpu_wr(mem_wr & toprollr),
+    .cpu_di(tr_cpu_di),
+    .cpu_sel(tr_cpu_sel),
+
+    .ioctl_addr(ioctl_addr),
+    .ioctl_dout(ioctl_dout),
+    .dl_tile0(ioctl_wr7 & tr_tile0_cs),
+    .dl_tile1(ioctl_wr7 & tr_tile1_cs),
+    .dl_bg0(ioctl_wr7 & tr_bg0_cs),
+    .dl_bg1(ioctl_wr7 & tr_bg1_cs),
+
+    .spr_pen(tr_spr_pen),
+    .spr_on(tr_spr_on),
+    .bg_pen(tr_bg_pen),
+    .in_clip(tr_clip)
+);
+
+// MAME screen_update_toprollr: bg, then big sprite / sprites (ctrl1 bit 5 puts the big sprite on top), all clipped;
+// the playfield goes over everything, unclipped
+wire tr_bs_on = pix_on(1'b0, {2'b00, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r;
+reg  [7:0] tr_pen;
+always_comb begin
+    tr_pen = 8'h00;
+    if (tr_clip) begin
+        tr_pen = 8'h60 + {2'b00, tr_bg_pen};
+        if (attr_big_sprite[5]) begin
+            if (tr_spr_on) tr_pen = {2'b00, tr_spr_pen};
+            if (tr_bs_on)  tr_pen = 8'h40 + {3'b000, bs_pixel_color_r[4:0]};
+        end else begin
+            if (tr_bs_on)  tr_pen = 8'h40 + {3'b000, bs_pixel_color_r[4:0]};
+            if (tr_spr_on) tr_pen = {2'b00, tr_spr_pen};
+        end
+    end
+    if (!pf_clear_r) tr_pen = {2'b00, pixel_color_r[5:0]};
+end
+
+reg [7:0] do_tr = 8'd0;
+always_ff @(posedge clk) if (ce12) do_tr <= pal_tr[tr_pen];
+
 reg [3:0] pal_b [64];
 always_ff @(posedge clk) if (dl_ym_pal_b) pal_b[ioctl_addr[5:0]] <= ioctl_dout[3:0];
 reg [3:0] do_pal_b = 4'd0;
@@ -963,7 +1138,9 @@ wire side_area = sidebg_en & (hinv ? (screen_x < 9'd64) : (screen_x >= 9'd192));
 
 reg [23:0] video_mux;
 always_comb begin
-    if (is_big_sprite_on && !(bs_prio && sprite_on_r))
+    if (toprollr)
+        video_mux = cc_rgb(do_tr);
+    else if (is_big_sprite_on && !(bs_prio && sprite_on_r))
         video_mux = bs_rgb;
     else if (yamato && pf_clear_d)
         video_mux = grad_rgb;
@@ -1002,11 +1179,12 @@ cclimber_snd snd
     .ay_din(cpu_do),
     .ay_dout(ay_dout),
 
-    .rate_we(ce12 & a800_we & ~swimmer),
+    .rate_we(ce12 & a800_we & ~swimmer & ~bagmanf),
     .vol_we(ce12 & b000_we & ~swimmer),
     .cpu_do(cpu_do),
-    .trigger(mainlatch[4] & ~swimmer),
+    .trigger(mainlatch[4] & ~swimmer & ~bagmanf),   // Le Bagnard: sample ROMs unpopulated
     .vol5_en(vol5_en),
+    .toprollr(toprollr),
 
     .ioctl_addr(ioctl_addr),
     .ioctl_dout(ioctl_dout),
@@ -1081,6 +1259,90 @@ yamato_snd snd_ym
     .audio(ym_audio)
 );
 
-assign audio = swimmer ? sw_audio : tangramq ? tq_audio : yamato ? ym_audio : cc_audio;
+//------------------------------------------------------- Le Bagnard speech daughterboard ------------------------------------//
+
+// A800-A807 LS259 (bagman.cpp): Q0-Q2 speech ROM bit select, Q3 start, Q4/Q5 ROM chip selects
+reg [7:0] tmslatch = 8'd0;
+always_ff @(posedge clk) begin
+    if (reset)
+        tmslatch <= 8'd0;
+    else if (cpu_fall && bagmanf && a800_we)
+        tmslatch[cpu_addr[2:0]] <= cpu_do[0];
+end
+
+// PROM clock 320 kHz (49.152 MHz * 5 / 768), TMS5110 sample every 40 PROM clocks (640 kHz / 80)
+reg  [9:0] tms_acc = 10'd0;
+reg  [5:0] tms_div = 6'd0;
+reg        tms_ce = 1'b0, tms_smp = 1'b0;
+always_ff @(posedge clk) begin
+    tms_ce  <= 1'b0;
+    tms_smp <= 1'b0;
+    if (tms_acc >= 10'd763) begin
+        tms_acc <= tms_acc - 10'd763;
+        tms_ce  <= 1'b1;
+        tms_div <= (tms_div == 6'd39) ? 6'd0 : tms_div + 6'd1;
+        tms_smp <= tms_div == 6'd39;
+    end else
+        tms_acc <= tms_acc + 10'd5;
+end
+
+wire [12:0] spch_addr;
+wire  [7:0] spch_q;
+wire  [3:0] tms_ctl;
+wire        tms_pdc, tms_m0, tms_bit, tms_busy;
+wire signed [15:0] tms_out;
+
+dpram_dc #(.widthad_a(13)) spch_rom
+(
+    .clock_a(clk),
+    .address_a(ioctl_addr[12:0]),
+    .data_a(ioctl_dout),
+    .wren_a(dl_spch),
+
+    .clock_b(clk),
+    .address_b(spch_addr),
+    .q_b(spch_q)
+);
+
+tmsprom tms_vsm
+(
+    .clk(clk),
+    .reset(reset | ~bagmanf),
+    .ce_romclk(tms_ce),
+    .chip_busy(tms_busy),
+    .enable(tmslatch[3]),
+    .bit_sel(3'd7 - {tmslatch[0], tmslatch[1], tmslatch[2]}),
+    .csq0(tmslatch[4]),
+    .csq1(tmslatch[5]),
+    .prom_wr(dl_sprom),
+    .prom_waddr(ioctl_addr[4:0]),
+    .prom_wdata(ioctl_dout),
+    .rom_addr(spch_addr),
+    .rom_q(spch_q),
+    .m0(tms_m0),
+    .data_bit(tms_bit),
+    .ctl(tms_ctl),
+    .pdc(tms_pdc)
+);
+
+tms5110 tms
+(
+    .clk(clk),
+    .reset(reset | ~bagmanf),
+    .ce_sample(tms_smp),
+    .ctl(tms_ctl),
+    .pdc(tms_pdc),
+    .m0(tms_m0),
+    .data_bit(tms_bit),
+    .busy(tms_busy),
+    .talk_status(),
+    .sample(tms_out)
+);
+
+// MAME bagman: AY 0.40, TMS5110 1.0; the CK mix carries the AY at 0.5, so speech goes in 1:1, saturated
+wire signed [16:0] bg_sum   = cc_audio + tms_out;
+wire signed [15:0] bg_audio = (bg_sum > 17'sd32767) ? 16'sd32767 : (bg_sum < -17'sd32768) ? -16'sd32768 : bg_sum[15:0];
+
+assign audio = swimmer ? sw_audio : tangramq ? tq_audio : yamato ? ym_audio : bagmanf ? bg_audio : cc_audio;
 
 endmodule
