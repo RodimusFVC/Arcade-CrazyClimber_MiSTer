@@ -1,5 +1,5 @@
 <misterromdescription>
-    <name>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 3, No Bonus Game)</name>
+    <name>Cannon Ball (Bootleg On Crazy Kong Hardware) (Set 3, No Bonus Game)</name>
     <region>World</region>
     <homebrew>no</homebrew>
     <bootleg>yes</bootleg>
@@ -73,6 +73,6 @@
     <rom index="4"></rom>
     <nvram index="4" size="215"></nvram>
 
-    <remark>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 3, No Bonus Game) (Soft Bootleg)</remark>
+    <remark>Cannon Ball (Bootleg On Crazy Kong Hardware) (Set 3, No Bonus Game) (Soft Bootleg)</remark>
     <mratimestamp>20260927000000</mratimestamp>
 </misterromdescription>

@@ -1,5 +1,5 @@
 <misterromdescription>
-    <name>Donkey Kong (Spanish Bootleg of Crazy Kong)</name>
+    <name>Donkey Kong (Spanish Bootleg Of Crazy Kong)</name>
     <region>Spain</region>
     <homebrew>no</homebrew>
     <bootleg>yes</bootleg>
@@ -73,6 +73,6 @@
     <rom index="4"></rom>
     <nvram index="4" size="173"></nvram>
 
-    <remark>Donkey Kong (Spanish Bootleg of Crazy Kong)</remark>
+    <remark>Donkey Kong (Spanish Bootleg Of Crazy Kong)</remark>
     <mratimestamp>20260927000000</mratimestamp>
 </misterromdescription>

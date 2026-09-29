@@ -1,5 +1,5 @@
 <misterromdescription>
-    <name>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 1, Buggy)</name>
+    <name>Cannon Ball (Bootleg On Crazy Kong Hardware) (Set 2, Buggy)</name>
     <region>World</region>
     <homebrew>no</homebrew>
     <bootleg>yes</bootleg>
@@ -8,10 +8,10 @@
     <platform></platform>
     <series>Cannon Ball</series>
     <year>1985</year>
-    <manufacturer>bootleg (Soft)</manufacturer>
+    <manufacturer>bootleg (TV Game Gruenberg)</manufacturer>
     <category>Shooter</category>
 
-    <setname>cannonb</setname>
+    <setname>cannonb2</setname>
     <parent>cannonbp</parent>
     <mameversion>0289</mameversion>
     <rbf>CrazyClimber</rbf>
@@ -34,12 +34,12 @@
     </switches>
 
     <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000 -->
-    <rom index="0" md5="none" zip="cannonb.zip|cannonbp.zip">
-        <part crc="43ad0d16" name="canballs.5d"/>
-        <part crc="3e0dacdd" name="canballs.5f"/>
-        <part crc="e18a836b" name="canballs.5h"/>
-        <part crc="6ed3cbf4" name="canballs.5k"/>
-        <part repeat="0x2800">00</part>
+    <rom index="0" md5="none" zip="cannonb2.zip|cannonbp.zip">
+        <part crc="7a3cba7c" name="cb1.bin"/>
+        <part crc="58ef3118" name="cb2.bin"/>
+        <part crc="e18a836b" name="cb3.bin"/>
+        <part crc="696ebdb0" name="cb4.bin"/>
+        <part repeat="0x2000">00</part>
         <part crc="602a6c2d" name="cb10.bin" offset="0x0" length="0x800"/>
         <part repeat="0x800">00</part>
         <part crc="602a6c2d" name="cb10.bin" offset="0x800" length="0x800"/>
@@ -48,18 +48,18 @@
         <part repeat="0x800">00</part>
         <part crc="2d036026" name="cb9.bin" offset="0x800" length="0x800"/>
         <part repeat="0x800">00</part>
-        <part crc="d1352c31" name="canballs.11c"/>
-        <part crc="a7a2fdbd" name="canballs.11a"/>
-        <part crc="5f0bcdfb" name="canballs.5s"/>
-        <part crc="9003ffbd" name="canballs.5p"/>
-        <part crc="b3fc1505" name="prom.v6"/>
-        <part crc="26aada9e" name="prom.u6"/>
-        <part crc="676b3166" name="prom.t6"/>
+        <part crc="80eb517d" name="cb7.bin"/>
+        <part crc="f67c80f1" name="cb8.bin"/>
+        <part crc="5f0bcdfb" name="cb6.bin"/>
+        <part crc="9003ffbd" name="cb5.bin"/>
+        <part crc="751c3325" name="v6.bin"/>
+        <part crc="c0539747" name="u6.bin"/>
+        <part crc="b4e827a5" name="t6.bin"/>
     </rom>
 
     <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
     <rom index="1">
-        <part>04 98 06</part>
+        <part>04 98 02</part>
     </rom>
 
     <!-- Index 3: hiscore config (MAME hiscore.dat), index 4: saved scores -->
@@ -73,6 +73,6 @@
     <rom index="4"></rom>
     <nvram index="4" size="215"></nvram>
 
-    <remark>Cannon Ball (Bootleg on Crazy Kong Hardware) (Set 1, Buggy) (Soft Bootleg)</remark>
+    <remark>Cannon Ball (Bootleg On Crazy Kong Hardware) (Set 2, Buggy) (TV Game Gruenberg Bootleg)</remark>
     <mratimestamp>20260927000000</mratimestamp>
 </misterromdescription>

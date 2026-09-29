@@ -475,14 +475,11 @@ def mra(g, games, segs):
 """
 
 
-SMALL_WORDS = {"a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "vs"}
-
-
 def title_case(text):
-    """Capitalise each word, keep acronyms (US, II, PCB), leave small words lower unless first."""
+    """Capitalise every word, small words included; acronyms (US, II, PCB) stay as written."""
     out = []
-    for i, word in enumerate(re.split(r"(\s+|[()/,-])", text)):
-        if word and word[0].isalpha() and (i == 0 or word.lower() not in SMALL_WORDS):
+    for word in re.split(r"(\s+|[()/,-])", text):
+        if word and word[0].isalpha():
             word = word[0].upper() + word[1:]
         out.append(word)
     return "".join(out)

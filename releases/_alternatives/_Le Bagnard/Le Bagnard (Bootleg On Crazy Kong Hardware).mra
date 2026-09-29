@@ -1,5 +1,5 @@
 <misterromdescription>
-    <name>Le Bagnard (Bootleg on Crazy Kong Hardware)</name>
+    <name>Le Bagnard (Bootleg On Crazy Kong Hardware)</name>
     <region>World</region>
     <homebrew>no</homebrew>
     <bootleg>yes</bootleg>
@@ -74,6 +74,6 @@
     <rom index="4"></rom>
     <nvram index="4" size="80"></nvram>
 
-    <remark>Le Bagnard (Bootleg on Crazy Kong Hardware)</remark>
+    <remark>Le Bagnard (Bootleg On Crazy Kong Hardware)</remark>
     <mratimestamp>20260927000000</mratimestamp>
 </misterromdescription>

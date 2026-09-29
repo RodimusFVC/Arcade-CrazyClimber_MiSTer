@@ -1,5 +1,5 @@
 <misterromdescription>
-    <name>Silver Land (Hack of River Patrol)</name>
+    <name>Silver Land (Hack Of River Patrol)</name>
     <region>World</region>
     <homebrew>no</homebrew>
     <bootleg>yes</bootleg>
@@ -80,6 +80,6 @@
     <rom index="4"></rom>
     <nvram index="4" size="30"></nvram>
 
-    <remark>Silver Land (Hack of River Patrol) (Falcon)</remark>
+    <remark>Silver Land (Hack Of River Patrol) (Falcon)</remark>
     <mratimestamp>20260927000000</mratimestamp>
 </misterromdescription>
