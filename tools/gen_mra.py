@@ -120,14 +120,14 @@ F_DECRYPT, F_VOL5, F_VERT, F_NMIQ3, F_SWIMMER, F_ROT90 = 0x01, 0x08, 0x10, 0x20,
 XOR = {"init_rpatrol": 1 << 1, "init_ckongb": 2 << 1, "init_dking": 3 << 1}
 
 BUTTONS = {
-    LAYOUT_TOPROLLR: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
-    LAYOUT_YAMATO: ("Button 1,Button 2,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 2, "8-way", ""),
-    LAYOUT_TANGRAMQ: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "2-way horizontal", ""),
-    LAYOUT_CANNONB: ("Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
-    LAYOUT_SWIMMER: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "8-way", ""),
+    LAYOUT_TOPROLLR: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
+    LAYOUT_YAMATO: ("Button 1,Button 2,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 2, "8-way", ""),
+    LAYOUT_TANGRAMQ: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "2-way horizontal", ""),
+    LAYOUT_CANNONB: ("Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
+    LAYOUT_SWIMMER: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "8-way", ""),
     LAYOUT_CC:      ("R Right,R Left,R Down,R Up,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 4, "8-way", "twin stick"),
-    LAYOUT_CKONG:   ("Jump,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "4-way", ""),
-    LAYOUT_RPATROL: ("Gas,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 1, "2-way horizontal", ""),
+    LAYOUT_CKONG:   ("Jump,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
+    LAYOUT_RPATROL: ("Gas,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "2-way horizontal", ""),
 }
 
 CC_COMMON = [

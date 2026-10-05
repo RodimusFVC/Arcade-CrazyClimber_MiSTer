@@ -56,6 +56,8 @@ module cclimber_board
     output              ce_pix,
 
     input               crt_flip,       // OSD CRT Flip, XORed with the game's flip latch
+    input  signed [3:0] h_adj,          // CRT position: HSYNC moved 2 pixels per step
+    input  signed [3:0] v_adj,          //               VSYNC moved 1 line per step
 
     output              flip_x,
     output              flip_y,
@@ -208,6 +210,13 @@ reg [8:0] hcnt   = 9'd511;
 reg [8:0] vcnt   = 9'd511;
 reg [8:0] vcnt_r = 9'd511;
 
+// CRT position: only the sync pulses move, blanking stays put. HSYNC 175 + 2h (inside hblank 137-263); VSYNC 3 lines
+// from line index 263 (vcnt 511) + v, wrapping at 264 (inside vblank 497-272)
+wire [8:0] hs_on    = 9'd175 + {{4{h_adj[3]}}, h_adj, 1'b0};
+wire [8:0] v_line   = vcnt - 9'd248;                                // 0-263
+wire [8:0] vs_start = v_adj[3] ? 9'd263 + {{5{1'b1}}, v_adj} : v_adj == 4'sd0 ? 9'd263 : {5'd0, v_adj} - 9'd1;
+wire [9:0] vs_dist  = v_line >= vs_start ? {1'b0, v_line - vs_start} : {1'b0, v_line} + 10'd264 - {1'b0, vs_start};
+
 always_ff @(posedge clk) begin
     if (ce_px) begin
         if (hcnt == 9'd511) begin
@@ -219,11 +228,10 @@ always_ff @(posedge clk) begin
         if (hcnt == 9'd175)
             vcnt <= (vcnt == 9'd511) ? 9'd248 : vcnt + 9'd1;
 
-        if (hcnt == 9'd175)      video_hs <= 1'b0;
-        else if (hcnt == 9'd204) video_hs <= 1'b1;
+        if (hcnt == hs_on)               video_hs <= 1'b0;
+        else if (hcnt == hs_on + 9'd29)  video_hs <= 1'b1;
 
-        if (vcnt == 9'd511)      video_vs <= 1'b0;
-        else if (vcnt == 9'd250) video_vs <= 1'b1;
+        video_vs <= vs_dist >= 10'd3;
 
         // +8 for the shift register, +1 pixel; vcnt has already stepped, so rows shown are 272..495 (y 16..239)
         if (hcnt == 9'd137) video_hblank <= 1'b1;

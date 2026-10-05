@@ -32,7 +32,7 @@ module emu
 
 wire        CLK_49M;
 wire        locked;
-wire [31:0] status;
+wire [127:0] status;
 wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire [10:0] ps2_key;
@@ -112,6 +112,8 @@ localparam CONF_STR = {
 	"P1OC,Orientation,Vert,Horz;",
 	"P1OB,HDMI Flip,Off,On;",
 	"P1OM,CRT Flip,Off,On;",
+	"P1O[31:28],H Position (CRT),0,+1,+2,+3,+4,+5,+6,+7,-8,-7,-6,-5,-4,-3,-2,-1;",
+	"P1O[35:32],V Position (CRT),0,+1,+2,+3,+4,+5,+6,+7,-8,-7,-6,-5,-4,-3,-2,-1;",
 	"P1OFH,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
 	"P2,Pause Options;",
@@ -125,7 +127,7 @@ localparam CONF_STR = {
 	"-;",
 	"R0,Reset;",
 	"J1,Btn 1,Btn 2,Btn 3,Btn 4,Coin,Start 1P,Start 2P,Pause;",
-	"jn,A,Y,B,X,Select,Start,R,L;",
+	"jn,A,B,X,Y,Select,Start,R,L;",
 	"V,v",`BUILD_DATE
 };
 
@@ -443,6 +445,8 @@ cclimber_board board
 	.ce_pix(ce_pix),
 
 	.crt_flip(status[22]),
+	.h_adj(status[31:28]),
+	.v_adj(status[35:32]),
 
 	.flip_x(flip_x),
 	.flip_y(flip_y),
