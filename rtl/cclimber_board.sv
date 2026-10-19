@@ -267,7 +267,10 @@ wire   pal_bank   = swimmer & ~au & mainlatch[4];
 wire cpu_rise = ce_px &  hcnt[0];
 wire cpu_fall = ce_px & ~hcnt[0];
 
-//------------------------------------------------------- Z80 -----------------------------------------------------------------//
+/////////////////////////////  Shared CPU / sound chip pool  /////////////////////////////
+
+// Only one board family runs at a time (selected by swimmer / tangramq / yamato), so the CPUs and AYs are instanced
+// once here and the active board drives them (rtl/chip_pool_pkg.sv). Pool chips take the core reset.
 
 wire [15:0] cpu_addr;
 wire  [7:0] cpu_do;
@@ -276,27 +279,93 @@ wire        cpu_m1_n, cpu_mreq_n, cpu_iorq_n, cpu_rd_n, cpu_wr_n;
 reg         cpu_nmi_n = 1'b1;
 reg         cpu_int_n = 1'b1;
 
-T80s #(.Mode(0), .T2Write(1), .IOWait(1)) z80
+// z80_0: main CPU, every board
+chip_pool_pkg::z80_i_t z80_0_i;
+chip_pool_pkg::z80_o_t z80_0_o;
+
+assign z80_0_i.ce    = cpu_rise & ~pause;
+assign z80_0_i.int_n = cpu_int_n;
+assign z80_0_i.nmi_n = cpu_nmi_n;
+assign z80_0_i.di    = cpu_di;
+
+wire [15:0] z80_0_a;
+wire  [7:0] z80_0_do;
+wire        z80_0_m1_n, z80_0_mreq_n, z80_0_iorq_n, z80_0_rd_n, z80_0_wr_n, z80_0_rfsh_n;
+
+T80s #(.Mode(0), .T2Write(1), .IOWait(1)) z80_0
 (
-    .RESET_n(~reset),
-    .CLK(clk),
-    .CEN(cpu_rise & ~pause),
-    .WAIT_n(1'b1),
-    .INT_n(cpu_int_n),
-    .NMI_n(cpu_nmi_n),
-    .BUSRQ_n(1'b1),
-    .M1_n(cpu_m1_n),
-    .MREQ_n(cpu_mreq_n),
-    .IORQ_n(cpu_iorq_n),
-    .RD_n(cpu_rd_n),
-    .WR_n(cpu_wr_n),
-    .RFSH_n(),
-    .HALT_n(),
-    .BUSAK_n(),
-    .OUT0(1'b0),
-    .A(cpu_addr),
-    .DI(cpu_di),
-    .DO(cpu_do)
+    .RESET_n(~reset), .CLK(clk), .CEN(z80_0_i.ce), .WAIT_n(1'b1), .INT_n(z80_0_i.int_n), .NMI_n(z80_0_i.nmi_n), .BUSRQ_n(1'b1),
+    .M1_n(z80_0_m1_n), .MREQ_n(z80_0_mreq_n), .IORQ_n(z80_0_iorq_n), .RD_n(z80_0_rd_n), .WR_n(z80_0_wr_n), .RFSH_n(z80_0_rfsh_n),
+    .HALT_n(), .BUSAK_n(), .OUT0(1'b0), .A(z80_0_a), .DI(z80_0_i.di), .DO(z80_0_do)
+);
+
+assign z80_0_o.a = z80_0_a;           assign z80_0_o.dout = z80_0_do;
+assign z80_0_o.m1_n = z80_0_m1_n;     assign z80_0_o.mreq_n = z80_0_mreq_n; assign z80_0_o.iorq_n = z80_0_iorq_n;
+assign z80_0_o.rd_n = z80_0_rd_n;     assign z80_0_o.wr_n = z80_0_wr_n;     assign z80_0_o.rfsh_n = z80_0_rfsh_n;
+
+assign cpu_addr   = z80_0_o.a;
+assign cpu_do     = z80_0_o.dout;
+assign cpu_m1_n   = z80_0_o.m1_n;
+assign cpu_mreq_n = z80_0_o.mreq_n;
+assign cpu_iorq_n = z80_0_o.iorq_n;
+assign cpu_rd_n   = z80_0_o.rd_n;
+assign cpu_wr_n   = z80_0_o.wr_n;
+
+// z80_1: sound CPU, Swimmer board (Swimmer, Guzzler, Au), Tangram Q, Yamato
+chip_pool_pkg::z80_i_t sw_z80_1_i, tq_z80_1_i, ym_z80_1_i, z80_1_i;
+chip_pool_pkg::z80_o_t z80_1_o;
+assign z80_1_i = swimmer ? sw_z80_1_i : tangramq ? tq_z80_1_i : ym_z80_1_i;
+
+wire [15:0] z80_1_a;
+wire  [7:0] z80_1_do;
+wire        z80_1_m1_n, z80_1_mreq_n, z80_1_iorq_n, z80_1_rd_n, z80_1_wr_n, z80_1_rfsh_n;
+
+T80s #(.Mode(0), .T2Write(1), .IOWait(1)) z80_1
+(
+    .RESET_n(~reset), .CLK(clk), .CEN(z80_1_i.ce), .WAIT_n(1'b1), .INT_n(z80_1_i.int_n), .NMI_n(z80_1_i.nmi_n), .BUSRQ_n(1'b1),
+    .M1_n(z80_1_m1_n), .MREQ_n(z80_1_mreq_n), .IORQ_n(z80_1_iorq_n), .RD_n(z80_1_rd_n), .WR_n(z80_1_wr_n), .RFSH_n(z80_1_rfsh_n),
+    .HALT_n(), .BUSAK_n(), .OUT0(1'b0), .A(z80_1_a), .DI(z80_1_i.di), .DO(z80_1_do)
+);
+
+assign z80_1_o.a = z80_1_a;           assign z80_1_o.dout = z80_1_do;
+assign z80_1_o.m1_n = z80_1_m1_n;     assign z80_1_o.mreq_n = z80_1_mreq_n; assign z80_1_o.iorq_n = z80_1_iorq_n;
+assign z80_1_o.rd_n = z80_1_rd_n;     assign z80_1_o.wr_n = z80_1_wr_n;     assign z80_1_o.rfsh_n = z80_1_rfsh_n;
+
+// AY-3-8910 x 2: aysel 0 = CC sound board (Crazy Climber, Crazy Kong, River Patrol, Cannon Ball, Top Roller, Le Bagnard)
+// or AY1 of the Swimmer / Tangram Q / Yamato sound boards; aysel 1 = their AY2
+chip_pool_pkg::aysel_i_t [0:0] cc_aysel_i;
+chip_pool_pkg::aysel_i_t [1:0] sw_aysel_i, tq_aysel_i, ym_aysel_i;
+chip_pool_pkg::aysel_o_t [1:0] aysel_o;
+
+genvar ai;
+generate
+    for (ai = 0; ai < 2; ai = ai + 1) begin : g_aysel
+        chip_pool_pkg::aysel_i_t i;
+        if (ai == 0) begin : g0 assign i = swimmer ? sw_aysel_i[ai] : tangramq ? tq_aysel_i[ai] : yamato ? ym_aysel_i[ai] : cc_aysel_i[0]; end
+        else         begin : g1 assign i = swimmer ? sw_aysel_i[ai] : tangramq ? tq_aysel_i[ai] : ym_aysel_i[ai]; end
+        wire [7:0] dout, a, b, c, ioa, iob;
+        jt49_bus #(.COMP(3'b010)) aysel
+        (
+            .rst_n(~reset), .clk(clk), .clk_en(i.ce), .bdir(i.bdir), .bc1(i.bc1), .din(i.din), .sel(i.sel),
+            .dout(dout), .sound(), .A(a), .B(b), .C(c), .sample(),
+            .IOA_in(8'h00), .IOA_out(ioa), .IOB_in(8'h00), .IOB_out(iob)
+        );
+        assign aysel_o[ai].dout = dout; assign aysel_o[ai].a = a; assign aysel_o[ai].b = b; assign aysel_o[ai].c = c;
+        assign aysel_o[ai].ioa_out = ioa; assign aysel_o[ai].iob_out = iob;
+    end
+endgenerate
+
+/////////////////////////////  Shared ROM blocks  /////////////////////////////
+
+// rom0: sound CPU program. Swimmer board index 2 0A000-0AFFF, Tangram Q index 5 0C000-0DFFF, Yamato index 6 0E000-0E7FF
+wire        load_rom0 = dl_snd | dl_tq_snd | dl_ym_snd;
+wire [12:0] sw_r0a, tq_r0a, ym_r0a;
+wire  [7:0] rom0_d;
+
+dpram_dc #(.widthad_a(13)) rom0
+(
+    .clock_a(clk), .address_a(ioctl_addr[12:0]), .data_a(ioctl_dout), .wren_a(load_rom0),
+    .clock_b(clk), .address_b(swimmer ? sw_r0a : tangramq ? tq_r0a : ym_r0a), .q_b(rom0_d)
 );
 
 //------------------------------------------------------- Address decode ------------------------------------------------------//
@@ -1198,6 +1267,9 @@ cclimber_snd snd
     .ioctl_dout(ioctl_dout),
     .smp_wr(dl_smp),
 
+    .aysel_i(cc_aysel_i),
+    .aysel_o(aysel_o[0:0]),
+
     .audio(cc_audio)
 );
 
@@ -1216,9 +1288,13 @@ swimmer_snd snd_sw
     .latch_we(swimmer & a800_we_d & ~a800_we),
     .latch_din(cpu_do),
 
-    .ioctl_addr(ioctl_addr),
-    .ioctl_dout(ioctl_dout),
-    .rom_wr(dl_snd),
+    .rom0_a(sw_r0a),
+    .rom0_d(rom0_d),
+
+    .z80_1_i(sw_z80_1_i),
+    .z80_1_o(z80_1_o),
+    .aysel_i(sw_aysel_i),
+    .aysel_o(aysel_o),
 
     .audio(sw_audio)
 );
@@ -1237,9 +1313,13 @@ tangramq_snd snd_tq
     .latch_we(tangramq & b000_we_d & ~b000_we),
     .latch_din(cpu_do),
 
-    .ioctl_addr(ioctl_addr),
-    .ioctl_dout(ioctl_dout),
-    .rom_wr(dl_tq_snd),
+    .rom0_a(tq_r0a),
+    .rom0_d(rom0_d),
+
+    .z80_1_i(tq_z80_1_i),
+    .z80_1_o(z80_1_o),
+    .aysel_i(tq_aysel_i),
+    .aysel_o(aysel_o),
 
     .audio(tq_audio)
 );
@@ -1260,9 +1340,13 @@ yamato_snd snd_ym
     .latch2_we(ym_out & (cpu_addr[7:0] == 8'h01)),
     .latch_din(cpu_do),
 
-    .ioctl_addr(ioctl_addr),
-    .ioctl_dout(ioctl_dout),
-    .rom_wr(dl_ym_snd),
+    .rom0_a(ym_r0a),
+    .rom0_d(rom0_d),
+
+    .z80_1_i(ym_z80_1_i),
+    .z80_1_o(z80_1_o),
+    .aysel_i(ym_aysel_i),
+    .aysel_o(aysel_o),
 
     .audio(ym_audio)
 );

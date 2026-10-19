@@ -29,6 +29,9 @@ module cclimber_snd
     input         [7:0] ioctl_dout,
     input               smp_wr,         // ioctl 0B000-0CFFF
 
+    output chip_pool_pkg::aysel_i_t [0:0] aysel_i,      // shared AY (rtl/cclimber_board.sv)
+    input  chip_pool_pkg::aysel_o_t [0:0] aysel_o,
+
     output signed [15:0] audio
 );
 
@@ -65,26 +68,18 @@ wire cen_smp = toprollr ? (tr_cen && tr_div == 2'd0) : cen_smp_cc;
 wire [7:0] ay_a, ay_b, ay_c;
 wire [7:0] start_addr, loop_addr;
 
-jt49_bus #(.COMP(3'b010)) ay
-(
-    .rst_n(~reset),
-    .clk(clk),
-    .clk_en(cen_ay),
-    .bdir(ay_bdir),
-    .bc1(ay_bc1),
-    .din(ay_din),
-    .sel(1'b1),
-    .dout(ay_dout),
-    .sound(),
-    .A(ay_a),
-    .B(ay_b),
-    .C(ay_c),
-    .sample(),
-    .IOA_in(8'h00),
-    .IOA_out(start_addr),
-    .IOB_in(8'h00),
-    .IOB_out(loop_addr)
-);
+// the shared AY (aysel 0); it no longer sees this board's reset, so a held board reads 0 as the reset chip did
+assign aysel_i[0].ce   = cen_ay;
+assign aysel_i[0].sel  = 1'b1;
+assign aysel_i[0].bdir = ay_bdir;
+assign aysel_i[0].bc1  = ay_bc1;
+assign aysel_i[0].din  = ay_din;
+assign ay_dout    = reset ? 8'h00 : aysel_o[0].dout;
+assign ay_a       = aysel_o[0].a;
+assign ay_b       = aysel_o[0].b;
+assign ay_c       = aysel_o[0].c;
+assign start_addr = aysel_o[0].ioa_out;
+assign loop_addr  = aysel_o[0].iob_out;
 
 //------------------------------------------------------- Sample player -------------------------------------------------------//
 

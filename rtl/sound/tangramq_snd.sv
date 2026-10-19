@@ -17,9 +17,13 @@ module tangramq_snd
     input               latch_we,       // main CPU write to $B000
     input         [7:0] latch_din,
 
-    input        [24:0] ioctl_addr,
-    input         [7:0] ioctl_dout,
-    input               rom_wr,         // ioctl index 5, 0C000-0DFFF
+    output       [12:0] rom0_a,         // shared sound ROM, ioctl index 5, 0C000-0DFFF (rtl/cclimber_board.sv)
+    input         [7:0] rom0_d,
+
+    output chip_pool_pkg::z80_i_t   z80_1_i,           // shared sound Z80 (rtl/cclimber_board.sv)
+    input  chip_pool_pkg::z80_o_t   z80_1_o,
+    output chip_pool_pkg::aysel_i_t [1:0] aysel_i,     // shared AYs (rtl/cclimber_board.sv)
+    input  chip_pool_pkg::aysel_o_t [1:0] aysel_o,
 
     output signed [15:0] audio
 );
@@ -57,28 +61,18 @@ wire        m1_n, mreq_n, iorq_n, rd_n, wr_n;
 reg         nmi_n = 1'b1;
 reg         int_n = 1'b1;
 
-T80s #(.Mode(0), .T2Write(1), .IOWait(1)) z80
-(
-    .RESET_n(~reset),
-    .CLK(clk),
-    .CEN(cen_4m & ~pause),
-    .WAIT_n(1'b1),
-    .INT_n(int_n),
-    .NMI_n(nmi_n),
-    .BUSRQ_n(1'b1),
-    .M1_n(m1_n),
-    .MREQ_n(mreq_n),
-    .IORQ_n(iorq_n),
-    .RD_n(rd_n),
-    .WR_n(wr_n),
-    .RFSH_n(),
-    .HALT_n(),
-    .BUSAK_n(),
-    .OUT0(1'b0),
-    .A(addr),
-    .DI(cpu_di),
-    .DO(cpu_do)
-);
+// the shared Z80 (z80_1)
+assign z80_1_i.ce    = cen_4m & ~pause;
+assign z80_1_i.int_n = int_n;
+assign z80_1_i.nmi_n = nmi_n;
+assign z80_1_i.di    = cpu_di;
+assign addr   = z80_1_o.a;
+assign cpu_do = z80_1_o.dout;
+assign m1_n   = z80_1_o.m1_n;
+assign mreq_n = z80_1_o.mreq_n;
+assign iorq_n = z80_1_o.iorq_n;
+assign rd_n   = z80_1_o.rd_n;
+assign wr_n   = z80_1_o.wr_n;
 
 // 0000-1FFF ROM, 4000 latch read, 8000-8009 AY1 / wave / AY2, A000 NMI clear, E000-E3FF RAM
 wire mem_rd   = ~mreq_n & ~rd_n;
@@ -92,17 +86,9 @@ wire int_ack  = ~m1_n & ~iorq_n;
 
 wire [7:0] rom_do, ram_do;
 
-dpram_dc #(.widthad_a(13)) rom
-(
-    .clock_a(clk),
-    .address_a(ioctl_addr[12:0]),
-    .data_a(ioctl_dout),
-    .wren_a(rom_wr),
-
-    .clock_b(clk),
-    .address_b(addr[12:0]),
-    .q_b(rom_do)
-);
+// the shared sound ROM (rom0)
+assign rom0_a = addr[12:0];
+assign rom_do = rom0_d;
 
 spram #(.DATA_WIDTH(8), .ADDR_WIDTH(10)) ram
 (
@@ -153,47 +139,24 @@ wire ay2_sel = mem_wr & snd_cs & (addr[3:1] == 3'b100);
 
 wire [7:0] a1, b1, c1, a2, b2, c2;
 
-jt49_bus #(.COMP(3'b010)) ay1
-(
-    .rst_n(~reset),
-    .clk(clk),
-    .clk_en(cen_4m),
-    .bdir(ay1_sel),
-    .bc1(ay1_sel & ~addr[0]),
-    .din(cpu_do),
-    .sel(1'b0),
-    .dout(),
-    .sound(),
-    .A(a1),
-    .B(b1),
-    .C(c1),
-    .sample(),
-    .IOA_in(8'h00),
-    .IOA_out(),
-    .IOB_in(8'h00),
-    .IOB_out()
-);
+// the shared AYs (aysel 0 / 1)
+assign aysel_i[0].ce   = cen_4m;
+assign aysel_i[0].sel  = 1'b0;
+assign aysel_i[0].bdir = ay1_sel;
+assign aysel_i[0].bc1  = ay1_sel & ~addr[0];
+assign aysel_i[0].din  = cpu_do;
+assign a1 = aysel_o[0].a;
+assign b1 = aysel_o[0].b;
+assign c1 = aysel_o[0].c;
 
-jt49_bus #(.COMP(3'b010)) ay2
-(
-    .rst_n(~reset),
-    .clk(clk),
-    .clk_en(cen_4m),
-    .bdir(ay2_sel),
-    .bc1(ay2_sel & ~addr[0]),
-    .din(cpu_do),
-    .sel(1'b0),
-    .dout(),
-    .sound(),
-    .A(a2),
-    .B(b2),
-    .C(c2),
-    .sample(),
-    .IOA_in(8'h00),
-    .IOA_out(),
-    .IOB_in(8'h00),
-    .IOB_out()
-);
+assign aysel_i[1].ce   = cen_4m;
+assign aysel_i[1].sel  = 1'b0;
+assign aysel_i[1].bdir = ay2_sel;
+assign aysel_i[1].bc1  = ay2_sel & ~addr[0];
+assign aysel_i[1].din  = cpu_do;
+assign a2 = aysel_o[1].a;
+assign b2 = aysel_o[1].b;
+assign c2 = aysel_o[1].c;
 
 //------------------------------------------------------- SNK wave (8002-8007) ------------------------------------------------//
 
