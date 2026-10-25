@@ -202,39 +202,53 @@ wire reset = RESET | status[0] | buttons[1] | ioctl_download | ~locked;
 
 ///////////////////         Keyboard           //////////////////
 
-reg kb_up = 0, kb_down = 0, kb_left = 0, kb_right = 0;
-reg kb_rup = 0, kb_rdown = 0, kb_rleft = 0, kb_rright = 0;
-reg kb_b1 = 0, kb_b2 = 0;
-reg kb_coin1 = 0, kb_coin2 = 0, kb_start1 = 0, kb_start2 = 0, kb_pause = 0;
-
-wire       pressed = ~ps2_key[9];
-wire [7:0] code    = ps2_key[7:0];
-
-always @(posedge CLK_49M) begin
-	reg old_state;
-	old_state <= ps2_key[10];
-	if (old_state != ps2_key[10]) begin
-		case (code)
-			'h16: kb_start1 <= pressed; // 1
-			'h1E: kb_start2 <= pressed; // 2
-			'h2E: kb_coin1  <= pressed; // 5
-			'h36: kb_coin2  <= pressed; // 6
-			'h4D: kb_pause  <= pressed; // P
-
-			'h75: kb_up     <= pressed; // up
-			'h72: kb_down   <= pressed; // down
-			'h6B: kb_left   <= pressed; // left
-			'h74: kb_right  <= pressed; // right
-			'h14: kb_b1     <= pressed; // ctrl
-			'h11: kb_b2     <= pressed; // alt
-
-			'h1D: kb_rup    <= pressed; // W
-			'h1B: kb_rdown  <= pressed; // S
-			'h1C: kb_rleft  <= pressed; // A
-			'h23: kb_rright <= pressed; // D
-		endcase
-	end
-end
+// CTL-2026-10-25: keyboard -> controllers.sv ctl_keyboard (keys now act on press), W / S / A / D through its extra-key
+// table. Original commented out below.
+// reg kb_up = 0, kb_down = 0, kb_left = 0, kb_right = 0;
+// reg kb_rup = 0, kb_rdown = 0, kb_rleft = 0, kb_rright = 0;
+// reg kb_b1 = 0, kb_b2 = 0;
+// reg kb_coin1 = 0, kb_coin2 = 0, kb_start1 = 0, kb_start2 = 0, kb_pause = 0;
+//
+// wire       pressed = ~ps2_key[9];
+// wire [7:0] code    = ps2_key[7:0];
+//
+// always @(posedge CLK_49M) begin
+// 	reg old_state;
+// 	old_state <= ps2_key[10];
+// 	if (old_state != ps2_key[10]) begin
+// 		case (code)
+// 			'h16: kb_start1 <= pressed; // 1
+// 			'h1E: kb_start2 <= pressed; // 2
+// 			'h2E: kb_coin1  <= pressed; // 5
+// 			'h36: kb_coin2  <= pressed; // 6
+// 			'h4D: kb_pause  <= pressed; // P
+//
+// 			'h75: kb_up     <= pressed; // up
+// 			'h72: kb_down   <= pressed; // down
+// 			'h6B: kb_left   <= pressed; // left
+// 			'h74: kb_right  <= pressed; // right
+// 			'h14: kb_b1     <= pressed; // ctrl
+// 			'h11: kb_b2     <= pressed; // alt
+//
+// 			'h1D: kb_rup    <= pressed; // W
+// 			'h1B: kb_rdown  <= pressed; // S
+// 			'h1C: kb_rleft  <= pressed; // A
+// 			'h23: kb_rright <= pressed; // D
+// 		endcase
+// 	end
+// end
+// kb: [0] up [1] down [2] left [3] right [4] Ctrl [5] Alt [6] 1 [7] 2 [8] 5 [9] 6 [10] 9 [11] T [12] P
+// kbx: [0] D (right hand right) [1] A (left) [2] S (down) [3] W (up)
+/* verilator lint_off UNUSED */
+wire [12:0] kb;                     // 9 and T are not used on this board
+/* verilator lint_on UNUSED */
+wire  [3:0] kbx;
+ctl_keyboard #(.NX(4), .NXO(4), .XKEYS({24'h10_1D_03, 24'h10_1B_02, 24'h10_1C_01, 24'h10_23_00})) u_kb(.clk(CLK_49M),
+	.ps2_key(ps2_key), .pause(pause_cpu), .kb(kb), .kbx(kbx));
+wire kb_up = kb[0], kb_down = kb[1], kb_left = kb[2], kb_right = kb[3];
+wire kb_rup = kbx[3], kb_rdown = kbx[2], kb_rleft = kbx[1], kb_rright = kbx[0];
+wire kb_b1 = kb[4], kb_b2 = kb[5];
+wire kb_coin1 = kb[8], kb_coin2 = kb[9], kb_start1 = kb[6], kb_start2 = kb[7], kb_pause = kb[12];
 
 //////////////////  Arcade Buttons/Interfaces   ///////////////////////////
 
@@ -258,15 +272,24 @@ wire m_b3_2   = joystick_1[6];
 wire m_b4_2   = joystick_1[7];
 
 // Right analog stick drives the right hand
-wire signed [7:0] rx0 = joystick_r_analog_0[7:0], ry0 = joystick_r_analog_0[15:8];
-wire signed [7:0] rx1 = joystick_r_analog_1[7:0], ry1 = joystick_r_analog_1[15:8];
-wire [3:0] rstick0 = {ry0 > 8'sd48, ry0 < -8'sd48, rx0 < -8'sd48, rx0 > 8'sd48};  // {D,U,L,R}
-wire [3:0] rstick1 = {ry1 > 8'sd48, ry1 < -8'sd48, rx1 < -8'sd48, rx1 > 8'sd48};
+// CTL-2026-10-25: right-stick directions -> ctl_stick_dirs (+-48 per axis). Original commented out below.
+// wire signed [7:0] rx0 = joystick_r_analog_0[7:0], ry0 = joystick_r_analog_0[15:8];
+// wire signed [7:0] rx1 = joystick_r_analog_1[7:0], ry1 = joystick_r_analog_1[15:8];
+// wire [3:0] rstick0 = {ry0 > 8'sd48, ry0 < -8'sd48, rx0 < -8'sd48, rx0 > 8'sd48};  // {D,U,L,R}
+// wire [3:0] rstick1 = {ry1 > 8'sd48, ry1 < -8'sd48, rx1 < -8'sd48, rx1 > 8'sd48};
+wire [3:0] rdir0, rdir1;            // {U, D, L, R}
+ctl_stick_dirs #(.MODE(0), .THRESH(7'd48)) u_rs0(.stick(joystick_r_analog_0), .dir(rdir0));
+ctl_stick_dirs #(.MODE(0), .THRESH(7'd48)) u_rs1(.stick(joystick_r_analog_1), .dir(rdir1));
+wire [3:0] rstick0 = {rdir0[2], rdir0[3], rdir0[1], rdir0[0]};  // {D,U,L,R}
+wire [3:0] rstick1 = {rdir1[2], rdir1[3], rdir1[1], rdir1[0]};
 
 wire m_coin1  = joystick_0[8]  | kb_coin1;
 wire m_coin2  = joystick_1[8]  | kb_coin2;
-wire m_start1 = joystick_0[9]  | joystick_1[9]  | kb_start1;
-wire m_start2 = joystick_0[10] | joystick_1[10] | kb_start2;
+// CTL-2026-10-25: pads never linked: pad 2's Start gives Start 2 only (ctl_ids form). Original commented out below.
+// wire m_start1 = joystick_0[9]  | joystick_1[9]  | kb_start1;
+// wire m_start2 = joystick_0[10] | joystick_1[10] | kb_start2;
+wire m_start1 = joystick_0[9]  | kb_start1;
+wire m_start2 = joystick_0[10] | joystick_1[10] | joystick_1[9] | kb_start2;
 wire m_pause  = joystick_0[11] | kb_pause;
 
 // DIP switches arrive from the OSD via ioctl index 254
@@ -278,30 +301,37 @@ end
 
 // Swimmer-board coins are PORT_IMPULSE(2): a press is latched, then presented for exactly two whole
 // frames starting at the next vblank, however long or briefly it is held
-reg       vblank_d = 1'b0;
-reg       coin1_d = 1'b0, coin2_d = 1'b0;
-reg       coin1_pend = 1'b0, coin2_pend = 1'b0;
-reg [1:0] coin1_frames = 2'd0, coin2_frames = 2'd0;
-wire      vblank_rise = vblank & ~vblank_d;
-always @(posedge CLK_49M) begin
-	vblank_d <= vblank;
-	coin1_d  <= m_coin1;
-	coin2_d  <= m_coin2;
-
-	if (m_coin1 & ~coin1_d) coin1_pend <= 1'b1;
-	if (vblank_rise) begin
-		if (coin1_pend)                 begin coin1_frames <= 2'd2; coin1_pend <= 1'b0; end
-		else if (coin1_frames != 2'd0)  coin1_frames <= coin1_frames - 2'd1;
-	end
-
-	if (m_coin2 & ~coin2_d) coin2_pend <= 1'b1;
-	if (vblank_rise) begin
-		if (coin2_pend)                 begin coin2_frames <= 2'd2; coin2_pend <= 1'b0; end
-		else if (coin2_frames != 2'd0)  coin2_frames <= coin2_frames - 2'd1;
-	end
-end
-wire coin1_imp = |coin1_frames;
-wire coin2_imp = |coin2_frames;
+// CTL-2026-10-25: -> controllers.sv ctl_coin_impulse, paused with the CPU (PAUSE_MODE 1: the frame count holds, a
+// press made while paused is discarded). Original commented out below.
+// reg       vblank_d = 1'b0;
+// reg       coin1_d = 1'b0, coin2_d = 1'b0;
+// reg       coin1_pend = 1'b0, coin2_pend = 1'b0;
+// reg [1:0] coin1_frames = 2'd0, coin2_frames = 2'd0;
+// wire      vblank_rise = vblank & ~vblank_d;
+// always @(posedge CLK_49M) begin
+// 	vblank_d <= vblank;
+// 	coin1_d  <= m_coin1;
+// 	coin2_d  <= m_coin2;
+//
+// 	if (m_coin1 & ~coin1_d) coin1_pend <= 1'b1;
+// 	if (vblank_rise) begin
+// 		if (coin1_pend)                 begin coin1_frames <= 2'd2; coin1_pend <= 1'b0; end
+// 		else if (coin1_frames != 2'd0)  coin1_frames <= coin1_frames - 2'd1;
+// 	end
+//
+// 	if (m_coin2 & ~coin2_d) coin2_pend <= 1'b1;
+// 	if (vblank_rise) begin
+// 		if (coin2_pend)                 begin coin2_frames <= 2'd2; coin2_pend <= 1'b0; end
+// 		else if (coin2_frames != 2'd0)  coin2_frames <= coin2_frames - 2'd1;
+// 	end
+// end
+// wire coin1_imp = |coin1_frames;
+// wire coin2_imp = |coin2_frames;
+wire coin1_imp, coin2_imp;
+ctl_coin_impulse #(.FRAMES(4'd2), .PAUSE_MODE(1)) u_coin1(.clk(CLK_49M), .pause(pause_cpu), .vblank(vblank), .en(1'b1),
+	.coin_raw(m_coin1), .coin(coin1_imp));
+ctl_coin_impulse #(.FRAMES(4'd2), .PAUSE_MODE(1)) u_coin2(.clk(CLK_49M), .pause(pause_cpu), .vblank(vblank), .en(1'b1),
+	.coin_raw(m_coin2), .coin(coin2_imp));
 
 // Per-game port layout and polarity (MAME INPUT_PORTS)
 reg [7:0] in_p1, in_p2, in_dsw, in_sys, in_sys1, in_sys2;
