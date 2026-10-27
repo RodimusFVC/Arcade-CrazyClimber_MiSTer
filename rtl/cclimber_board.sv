@@ -834,7 +834,11 @@ endfunction
 reg  [8:0] addr_ram_sprite = 9'd0;
 
 // Swimmer draws sprites one pixel left of CC (MAME x vs x+1, flipped 240-x vs 242-x)
-wire [8:0] sprite_x_load = {1'b0, x_sprite ^ {8{hinv}}} - {8'd0, swimmer | yamato};
+// CRT flip toggles HINV, but the PCB's flipped sprite X (242-x) is 2 px off a true mirror of the unflipped one;
+// move the sprite 2 px right on screen so the OSD flip is an exact 180 (sim-measured on both HINV paths: the buffer is
+// written down-counting when flipped but always read up-counting, so +2 is right in both)
+wire [8:0] sprite_crt_adj = crt_flip ? 9'd2 : 9'd0;
+wire [8:0] sprite_x_load = {1'b0, x_sprite ^ {8{hinv}}} - {8'd0, swimmer | yamato} + sprite_crt_adj;
 
 always_ff @(posedge clk) begin
     if (ce12) begin
@@ -892,7 +896,12 @@ reg  [7:0] bs_vis_d = 8'd0;
 wire [7:0] bs_rom0_do, bs_rom1_do, bs_rom2_do;
 
 // Top Roller: ctrl bits 4/5 are code bit 9 / priority, and the big sprite follows the screen flip (MAME toprollr_draw_bigsprite)
-wire bs_fx = toprollr ? hinv : attr_big_sprite[4];
+// CRT flip: the big sprite X path does not see HINV (MAME cclimber_draw_bigsprite ignores flip_screen_x; games flip it
+// in software), so the OSD flip mirrors it here instead: content via bs_fx, position via x_bs_pos = BS_CRT_FLIP_X - x.
+// Y already follows VINV through y_line.
+localparam [7:0] BS_CRT_FLIP_X = 8'd144;
+wire [7:0] x_bs_pos = crt_flip ? BS_CRT_FLIP_X - x_big_sprite : x_big_sprite;
+wire bs_fx = toprollr ? hinv : attr_big_sprite[4] ^ crt_flip;
 wire bs_fy = toprollr ? 1'b0 : attr_big_sprite[5];
 
 reg [7:0] xy_big_sprite;
@@ -940,7 +949,7 @@ always_ff @(posedge clk) begin
         if (ena_pixel)
             x_bs_cnt <= x_bs_cnt + 8'd1;
         if (is_sprite && sprite == 3'b110 && ena_pixel)
-            x_bs_cnt <= 8'd120 + (x_big_sprite & 8'hF8);
+            x_bs_cnt <= 8'd120 + (x_bs_pos & 8'hF8);
 
         if (x_bs_cnt[2:0] == 3'b111 && ena_pixel) begin
             bs_tile_code_r <= bs_tile_code;
@@ -1000,7 +1009,7 @@ end
 
 // Big sprite pen: CC {colour3, 2 bits} and Swimmer {colour2, 3 bits} index a 32-entry PROM;
 // Au {colour3, 3 bits} indexes the palette RAM
-wire [2:0] bs_sel = ~x_big_sprite[2:0];
+wire [2:0] bs_sel = ~x_bs_pos[2:0];
 wire [5:0] bs_pixel_color = swimmer ? {attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel], bs_graph3_d[bs_sel]}
                                     : {1'b0, attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel]};
 
