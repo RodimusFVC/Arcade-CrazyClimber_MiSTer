@@ -19,15 +19,18 @@ module swimmer_snd
     input               latch_we,       // main CPU write to $A800 (/WRS)
     input         [7:0] latch_din,
 
-    output       [12:0] rom0_a,         // shared sound ROM, ioctl index 2, 0A000-0AFFF (rtl/cclimber_board.sv)
+    output       [12:0] rom0_a,         // shared sound ROM, ioctl index 2, 0A000-0AFFF (rtl/cclimber_dispatcher.sv)
     input         [7:0] rom0_d,
 
-    output chip_pool_pkg::z80_i_t   z80_1_i,           // shared sound Z80 (rtl/cclimber_board.sv)
+    output chip_pool_pkg::z80_i_t   z80_1_i,           // shared sound Z80 (rtl/cclimber_dispatcher.sv)
     input  chip_pool_pkg::z80_o_t   z80_1_o,
-    output chip_pool_pkg::aysel_i_t [1:0] aysel_i,     // shared AYs (rtl/cclimber_board.sv)
+    output chip_pool_pkg::aysel_i_t [1:0] aysel_i,     // shared AYs (rtl/cclimber_dispatcher.sv)
     input  chip_pool_pkg::aysel_o_t [1:0] aysel_o,
 
-    output signed [15:0] audio
+    output signed [15:0] audio,
+
+    output ram_pool_pkg::pram_i_t pr_i,         // sound RAM = pool block sp 3 (port A) in the dispatcher
+    input  ram_pool_pkg::pram_o_t pr_o
 );
 
 //------------------------------------------------------- Clocks --------------------------------------------------------------//
@@ -95,14 +98,13 @@ wire [7:0] rom_do, ram_do;
 assign rom0_a = {1'b0, addr[11:0]};
 assign rom_do = rom0_d;
 
-spram #(.DATA_WIDTH(8), .ADDR_WIDTH(10)) ram
-(
-    .clk(clk),
-    .addr(addr[9:0]),
-    .data(cpu_do),
-    .q(ram_do),
-    .we(mem_wr & ram_cs)
-);
+assign pr_i.a_addr = 15'(addr[9:0]);
+assign pr_i.a_d    = cpu_do;
+assign pr_i.a_we   = mem_wr & ram_cs;
+assign pr_i.b_addr = 15'(15'd0);
+assign pr_i.b_d    = 8'd0;
+assign pr_i.b_we   = 1'b0;
+assign ram_do = pr_o.a_q;
 
 //------------------------------------------------------- Sound latch / interrupts --------------------------------------------//
 

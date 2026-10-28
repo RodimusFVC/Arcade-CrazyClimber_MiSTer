@@ -1,16 +1,18 @@
 set_global_assignment -name VHDL_INPUT_VERSION VHDL_2008
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/chip_pool_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/ram_pool_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE Arcade-CrazyClimber.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/cclimber_board.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/toprollr_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cclimber_dispatcher.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/cclimber/cclimber_main.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/cclimber/cclimber_snd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/toprollr/toprollr_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/swimmer/swimmer_snd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/tangramq/tangramq_snd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/yamato/yamato_snd.sv
 
 set_global_assignment -name QIP_FILE rtl/cpu/T80/T80.qip
 
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/cclimber_snd.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/swimmer_snd.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/tangramq_snd.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/yamato_snd.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/tms5110.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/tmsprom.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/segacrypt/sega_315_5018.sv
@@ -18,7 +20,13 @@ set_global_assignment -name QIP_FILE rtl/sound/v_sound.qip
 
 set_global_assignment -name VERILOG_FILE rtl/mister_custom/pause.v
 set_global_assignment -name VERILOG_FILE rtl/mister_custom/hiscore.v
-# CTL-2026-10-25: shared input library (controllers.sv v2)
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister_custom/controllers.sv
 
-set_global_assignment -name QIP_FILE rtl/ram_rom/cc_ram_rom.qip
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/ram_rom/dpram_dc.sv
+set_global_assignment -name VHDL_FILE rtl/ram_rom/spram.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/ram_rom/rom_loader.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/art/artwork.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/art/art_resample.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/art/png_decode.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/art/inflate.sv

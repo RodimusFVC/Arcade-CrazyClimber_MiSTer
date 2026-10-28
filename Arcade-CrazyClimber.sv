@@ -42,7 +42,8 @@ wire        ioctl_upload_req;
 wire  [7:0] ioctl_din;
 wire        ioctl_wr;
 wire  [7:0] ioctl_index;
-wire [24:0] ioctl_addr;
+wire [26:0] ioctl_addr27;                     // hps_io's full address: the artwork download can pass 32 MB
+wire [24:0] ioctl_addr = ioctl_addr27[24:0];  // every other ioctl user
 wire  [7:0] ioctl_dout;
 wire [15:0] joystick_0, joystick_1;
 wire [15:0] joystick_r_analog_0;   // right analog stick: [15:8]=Y signed, [7:0]=X signed
@@ -101,8 +102,11 @@ wire vert_view = game_vert & ~status[12];
 
 wire [1:0] ar = status[14:13];
 
-assign VIDEO_ARX = (!ar) ? (vert_view ? 12'd3 : 12'd4) : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? (vert_view ? 12'd4 : 12'd3) : 12'd0;
+wire        art_fb;                // artwork framebuffer on HDMI: square canvas pixels
+wire        art_wait, art_avail;
+wire [11:0] art_cw, art_ch;
+assign VIDEO_ARX = (!ar) ? (art_fb ? art_cw : vert_view ? 12'd3 : 12'd4) : (ar - 1'd1);
+assign VIDEO_ARY = (!ar) ? (art_fb ? art_ch : vert_view ? 12'd4 : 12'd3) : 12'd0;
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -123,6 +127,16 @@ localparam CONF_STR = {
 	"P3,High Score Options;",
 	"P3OR,Autosave Hiscores,Off,On;",
 	"-;",
+	"H1P4,Game Options;",
+	"H1P4-,Artwork (MAME layout views);",
+	"H1P4O[50:48],View,Off,View 1,View 2,View 3,View 4,View 5,View 6,View 7;",
+	"H1P4O[51],Backdrop,On,Off;",
+	"H1P4O[52],Overlay,On,Off;",
+	"H1P4O[53],Bezel,On,Off;",
+	"H1P4O[56],Control Panel,On,Off;",
+	"H1P4O[54],Side Art,On,Off;",
+	"H1P4O[55],Zoom to Screen,Off,On;",
+	"H1-;",
 	"DIP;",
 	"-;",
 	"R0,Reset;",
@@ -144,15 +158,16 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({direct_video}),
+	.status_menumask({~art_avail, direct_video}),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_upload(ioctl_upload),
 	.ioctl_upload_req(ioctl_upload_req),
 	.ioctl_wr(ioctl_wr),
-	.ioctl_addr(ioctl_addr),
+	.ioctl_addr(ioctl_addr27),
 	.ioctl_dout(ioctl_dout),
 	.ioctl_din(ioctl_din),
+	.ioctl_wait(art_wait),
 	.ioctl_index(ioctl_index),
 
 	.joystick_0(joystick_0),
@@ -202,43 +217,8 @@ wire reset = RESET | status[0] | buttons[1] | ioctl_download | ~locked;
 
 ///////////////////         Keyboard           //////////////////
 
-// CTL-2026-10-25: keyboard -> controllers.sv ctl_keyboard (keys now act on press), W / S / A / D through its extra-key
-// table. Original commented out below.
-// reg kb_up = 0, kb_down = 0, kb_left = 0, kb_right = 0;
-// reg kb_rup = 0, kb_rdown = 0, kb_rleft = 0, kb_rright = 0;
-// reg kb_b1 = 0, kb_b2 = 0;
-// reg kb_coin1 = 0, kb_coin2 = 0, kb_start1 = 0, kb_start2 = 0, kb_pause = 0;
-//
-// wire       pressed = ~ps2_key[9];
-// wire [7:0] code    = ps2_key[7:0];
-//
-// always @(posedge CLK_49M) begin
-// 	reg old_state;
-// 	old_state <= ps2_key[10];
-// 	if (old_state != ps2_key[10]) begin
-// 		case (code)
-// 			'h16: kb_start1 <= pressed; // 1
-// 			'h1E: kb_start2 <= pressed; // 2
-// 			'h2E: kb_coin1  <= pressed; // 5
-// 			'h36: kb_coin2  <= pressed; // 6
-// 			'h4D: kb_pause  <= pressed; // P
-//
-// 			'h75: kb_up     <= pressed; // up
-// 			'h72: kb_down   <= pressed; // down
-// 			'h6B: kb_left   <= pressed; // left
-// 			'h74: kb_right  <= pressed; // right
-// 			'h14: kb_b1     <= pressed; // ctrl
-// 			'h11: kb_b2     <= pressed; // alt
-//
-// 			'h1D: kb_rup    <= pressed; // W
-// 			'h1B: kb_rdown  <= pressed; // S
-// 			'h1C: kb_rleft  <= pressed; // A
-// 			'h23: kb_rright <= pressed; // D
-// 		endcase
-// 	end
-// end
-// kb: [0] up [1] down [2] left [3] right [4] Ctrl [5] Alt [6] 1 [7] 2 [8] 5 [9] 6 [10] 9 [11] T [12] P
-// kbx: [0] D (right hand right) [1] A (left) [2] S (down) [3] W (up)
+// keyboard -> controllers.sv ctl_keyboard (keys now act on press), W / S / A / D through its extra-key
+// table.
 /* verilator lint_off UNUSED */
 wire [12:0] kb;                     // 9 and T are not used on this board
 /* verilator lint_on UNUSED */
@@ -272,12 +252,8 @@ wire m_b3_2   = joystick_1[6];
 wire m_b4_2   = joystick_1[7];
 
 // Right analog stick drives the right hand
-// CTL-2026-10-25: right-stick directions -> ctl_stick_dirs (+-48 per axis). Original commented out below.
-// wire signed [7:0] rx0 = joystick_r_analog_0[7:0], ry0 = joystick_r_analog_0[15:8];
-// wire signed [7:0] rx1 = joystick_r_analog_1[7:0], ry1 = joystick_r_analog_1[15:8];
-// wire [3:0] rstick0 = {ry0 > 8'sd48, ry0 < -8'sd48, rx0 < -8'sd48, rx0 > 8'sd48};  // {D,U,L,R}
-// wire [3:0] rstick1 = {ry1 > 8'sd48, ry1 < -8'sd48, rx1 < -8'sd48, rx1 > 8'sd48};
 wire [3:0] rdir0, rdir1;            // {U, D, L, R}
+// right-stick directions -> ctl_stick_dirs (+-48 per axis)
 ctl_stick_dirs #(.MODE(0), .THRESH(7'd48)) u_rs0(.stick(joystick_r_analog_0), .dir(rdir0));
 ctl_stick_dirs #(.MODE(0), .THRESH(7'd48)) u_rs1(.stick(joystick_r_analog_1), .dir(rdir1));
 wire [3:0] rstick0 = {rdir0[2], rdir0[3], rdir0[1], rdir0[0]};  // {D,U,L,R}
@@ -285,9 +261,7 @@ wire [3:0] rstick1 = {rdir1[2], rdir1[3], rdir1[1], rdir1[0]};
 
 wire m_coin1  = joystick_0[8]  | kb_coin1;
 wire m_coin2  = joystick_1[8]  | kb_coin2;
-// CTL-2026-10-25: pads never linked: pad 2's Start gives Start 2 only (ctl_ids form). Original commented out below.
-// wire m_start1 = joystick_0[9]  | joystick_1[9]  | kb_start1;
-// wire m_start2 = joystick_0[10] | joystick_1[10] | kb_start2;
+// pads never linked: pad 2's Start gives Start 2 only
 wire m_start1 = joystick_0[9]  | kb_start1;
 wire m_start2 = joystick_0[10] | joystick_1[10] | joystick_1[9] | kb_start2;
 wire m_pause  = joystick_0[11] | kb_pause;
@@ -301,39 +275,15 @@ end
 
 // Swimmer-board coins are PORT_IMPULSE(2): a press is latched, then presented for exactly two whole
 // frames starting at the next vblank, however long or briefly it is held
-// CTL-2026-10-25: -> controllers.sv ctl_coin_impulse, paused with the CPU (PAUSE_MODE 1: the frame count holds, a
-// press made while paused is discarded). Original commented out below.
-// reg       vblank_d = 1'b0;
-// reg       coin1_d = 1'b0, coin2_d = 1'b0;
-// reg       coin1_pend = 1'b0, coin2_pend = 1'b0;
-// reg [1:0] coin1_frames = 2'd0, coin2_frames = 2'd0;
-// wire      vblank_rise = vblank & ~vblank_d;
-// always @(posedge CLK_49M) begin
-// 	vblank_d <= vblank;
-// 	coin1_d  <= m_coin1;
-// 	coin2_d  <= m_coin2;
-//
-// 	if (m_coin1 & ~coin1_d) coin1_pend <= 1'b1;
-// 	if (vblank_rise) begin
-// 		if (coin1_pend)                 begin coin1_frames <= 2'd2; coin1_pend <= 1'b0; end
-// 		else if (coin1_frames != 2'd0)  coin1_frames <= coin1_frames - 2'd1;
-// 	end
-//
-// 	if (m_coin2 & ~coin2_d) coin2_pend <= 1'b1;
-// 	if (vblank_rise) begin
-// 		if (coin2_pend)                 begin coin2_frames <= 2'd2; coin2_pend <= 1'b0; end
-// 		else if (coin2_frames != 2'd0)  coin2_frames <= coin2_frames - 2'd1;
-// 	end
-// end
-// wire coin1_imp = |coin1_frames;
-// wire coin2_imp = |coin2_frames;
+// -> controllers.sv ctl_coin_impulse, paused with the CPU (PAUSE_MODE 1: the frame count holds, a
+// press made while paused is discarded).
 wire coin1_imp, coin2_imp;
 ctl_coin_impulse #(.FRAMES(4'd2), .PAUSE_MODE(1)) u_coin1(.clk(CLK_49M), .pause(pause_cpu), .vblank(vblank), .en(1'b1),
 	.coin_raw(m_coin1), .coin(coin1_imp));
 ctl_coin_impulse #(.FRAMES(4'd2), .PAUSE_MODE(1)) u_coin2(.clk(CLK_49M), .pause(pause_cpu), .vblank(vblank), .en(1'b1),
 	.coin_raw(m_coin2), .coin(coin2_imp));
 
-// Per-game port layout and polarity (MAME INPUT_PORTS)
+// Per-game port layout and polarity
 reg [7:0] in_p1, in_p2, in_dsw, in_sys, in_sys1, in_sys2;
 always @(*) begin
 	in_dsw  = dip_sw[0];
@@ -405,11 +355,71 @@ wire hblank, vblank;
 wire hs, vs;
 wire [7:0] r, g, b;
 wire ce_pix;
+wire bd_hblank, bd_vblank, bd_hs, bd_vs;
+wire [7:0] bd_r, bd_g, bd_b;
+
+// MAME artwork (ioctl index 10: indexes 0-7 are ROM layouts / config; OSD Game Options page): native composite on the
+// core video (one pixel late), full view through the DDR3 framebuffer on HDMI
+wire        art_run, art_ddr;
+wire [31:0] art_fb_base;
+wire  [7:0] art_burstcnt, art_be;
+wire [28:0] art_addr;
+wire [63:0] art_din;
+wire        art_rd, art_we, art_clk;
+artwork #(.IDX(8'd10)) artwork
+(
+	.clk(CLK_49M),
+	.sel({1'b0, status[50:48]}), .layer_off({status[56], status[53:51]}), .side_off(status[54]), .zoom(status[55]),
+	.crt_flip(status[22]), .hdmi_flip(status[11]), .turn(game_vert & status[12]), .avail(art_avail),
+	.hdmi_w(HDMI_WIDTH), .hdmi_h(HDMI_HEIGHT),
+	.ioctl_download(ioctl_download), .ioctl_index(ioctl_index), .ioctl_wr(ioctl_wr),
+	.ioctl_addr(ioctl_addr27), .ioctl_dout(ioctl_dout), .ioctl_wait(art_wait),
+	.ce_pix(ce_pix),
+	.hs_in(bd_hs), .vs_in(bd_vs), .hblank_in(bd_hblank), .vblank_in(bd_vblank), .rgb_in({bd_r, bd_g, bd_b}),
+	.hs_out(hs), .vs_out(vs), .hblank_out(hblank), .vblank_out(vblank), .rgb_out({r, g, b}),
+	.running(art_run), .ddr_owner(art_ddr), .canvas_w(art_cw), .canvas_h(art_ch),
+	.fb_base(art_fb_base), .fb_vbl(FB_VBL),
+	.DDRAM_CLK(art_clk), .DDRAM_BUSY(DDRAM_BUSY), .DDRAM_BURSTCNT(art_burstcnt), .DDRAM_ADDR(art_addr),
+	.DDRAM_DOUT(DDRAM_DOUT), .DDRAM_DOUT_READY(DDRAM_DOUT_READY), .DDRAM_RD(art_rd),
+	.DDRAM_DIN(art_din), .DDRAM_BE(art_be), .DDRAM_WE(art_we)
+);
+// Orientation Horz (rotated monitor): the artwork turns its own view, so it keeps the framebuffer
+assign art_fb = art_run & ~direct_video;
 
 wire rotate_ccw = ~game_flags[7];  // ROT270 sets rotate CCW, ROT90 sets CW
 wire no_rotate  = ~game_vert | status[12] | direct_video;
 wire flip       = status[11];
-screen_rotate screen_rotate(.*);
+wire        sr_fb_en, sr_clk, sr_rd, sr_we;
+wire  [4:0] sr_fb_format;
+wire [11:0] sr_fb_w, sr_fb_h;
+wire [31:0] sr_fb_base;
+wire [13:0] sr_fb_stride;
+wire  [7:0] sr_burstcnt, sr_be;
+wire [28:0] sr_addr;
+wire [63:0] sr_din;
+screen_rotate screen_rotate
+(
+	.*,
+	.FB_EN(sr_fb_en), .FB_FORMAT(sr_fb_format), .FB_WIDTH(sr_fb_w), .FB_HEIGHT(sr_fb_h),
+	.FB_BASE(sr_fb_base), .FB_STRIDE(sr_fb_stride),
+	.DDRAM_CLK(sr_clk), .DDRAM_BURSTCNT(sr_burstcnt), .DDRAM_ADDR(sr_addr), .DDRAM_DIN(sr_din),
+	.DDRAM_BE(sr_be), .DDRAM_WE(sr_we), .DDRAM_RD(sr_rd)
+);
+
+// the artwork takes the framebuffer while it draws, and DDR3 while it loads or draws
+assign FB_EN     = art_fb | sr_fb_en;
+assign FB_FORMAT = art_fb ? 5'b00110  : sr_fb_format;
+assign FB_WIDTH  = art_fb ? art_cw    : sr_fb_w;
+assign FB_HEIGHT = art_fb ? art_ch    : sr_fb_h;
+assign FB_BASE   = art_fb ? art_fb_base : sr_fb_base;
+assign FB_STRIDE = art_fb ? 14'd8192  : sr_fb_stride;
+assign DDRAM_CLK      = CLK_49M;
+assign DDRAM_BURSTCNT = art_ddr ? art_burstcnt : sr_burstcnt;
+assign DDRAM_ADDR     = art_ddr ? art_addr : sr_addr;
+assign DDRAM_DIN      = art_ddr ? art_din : sr_din;
+assign DDRAM_BE       = art_ddr ? art_be : sr_be;
+assign DDRAM_WE       = art_ddr ? art_we : sr_we;
+assign DDRAM_RD       = art_ddr ? art_rd : sr_rd;
 
 arcade_video #(260,24) arcade_video
 (
@@ -430,7 +440,7 @@ arcade_video #(260,24) arcade_video
 
 wire flip_x, flip_y;
 
-cclimber_board board
+cclimber_dispatcher board
 (
 	.clk(CLK_49M),
 	.reset(reset),
@@ -465,13 +475,13 @@ cclimber_board board
 	.ioctl_wr6(ioctl_wr & (ioctl_index == 8'd6)),
 	.ioctl_wr7(ioctl_wr & (ioctl_index == 8'd7)),
 
-	.video_r(r),
-	.video_g(g),
-	.video_b(b),
-	.video_hs(hs),
-	.video_vs(vs),
-	.video_hblank(hblank),
-	.video_vblank(vblank),
+	.video_r(bd_r),
+	.video_g(bd_g),
+	.video_b(bd_b),
+	.video_hs(bd_hs),
+	.video_vs(bd_vs),
+	.video_hblank(bd_hblank),
+	.video_vblank(bd_vblank),
 	.ce_pix(ce_pix),
 
 	.crt_flip(status[22]),

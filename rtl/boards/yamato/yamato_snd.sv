@@ -17,15 +17,18 @@ module yamato_snd
     input               latch2_we,      // main CPU OUT ($01)
     input         [7:0] latch_din,
 
-    output       [12:0] rom0_a,         // shared sound ROM, ioctl index 6, 0E000-0E7FF (rtl/cclimber_board.sv)
+    output       [12:0] rom0_a,         // shared sound ROM, ioctl index 6, 0E000-0E7FF (rtl/cclimber_dispatcher.sv)
     input         [7:0] rom0_d,
 
-    output chip_pool_pkg::z80_i_t   z80_1_i,           // shared sound Z80 (rtl/cclimber_board.sv)
+    output chip_pool_pkg::z80_i_t   z80_1_i,           // shared sound Z80 (rtl/cclimber_dispatcher.sv)
     input  chip_pool_pkg::z80_o_t   z80_1_o,
-    output chip_pool_pkg::aysel_i_t [1:0] aysel_i,     // shared AYs (rtl/cclimber_board.sv)
+    output chip_pool_pkg::aysel_i_t [1:0] aysel_i,     // shared AYs (rtl/cclimber_dispatcher.sv)
     input  chip_pool_pkg::aysel_o_t [1:0] aysel_o,
 
-    output signed [15:0] audio
+    output signed [15:0] audio,
+
+    output ram_pool_pkg::pram_i_t pr_i,         // sound RAM = pool block sp 3 (port A) in the dispatcher
+    input  ram_pool_pkg::pram_o_t pr_o
 );
 
 //------------------------------------------------------- Clocks --------------------------------------------------------------//
@@ -74,14 +77,13 @@ wire [7:0] rom_do, ram_do;
 assign rom0_a = {2'b00, addr[10:0]};
 assign rom_do = rom0_d;
 
-spram #(.DATA_WIDTH(8), .ADDR_WIDTH(10)) ram
-(
-    .clk(clk),
-    .addr(addr[9:0]),
-    .data(cpu_do),
-    .q(ram_do),
-    .we(mem_wr & ram_cs)
-);
+assign pr_i.a_addr = 15'(addr[9:0]);
+assign pr_i.a_d    = cpu_do;
+assign pr_i.a_we   = mem_wr & ram_cs;
+assign pr_i.b_addr = 15'(15'd0);
+assign pr_i.b_d    = 8'd0;
+assign pr_i.b_we   = 1'b0;
+assign ram_do = pr_o.a_q;
 
 //------------------------------------------------------- Sound latches (polled, no interrupts) -------------------------------//
 
@@ -140,7 +142,7 @@ assign c2 = aysel_o[1].c;
 
 //------------------------------------------------------- Mix -----------------------------------------------------------------//
 
-// MAME: both AYs at 0.25
+// both AYs at 0.25
 wire [10:0] sum = {3'b000, a1} + {3'b000, b1} + {3'b000, c1} + {3'b000, a2} + {3'b000, b2} + {3'b000, c2};
 
 reg [4:0] dc_div = 5'd0;

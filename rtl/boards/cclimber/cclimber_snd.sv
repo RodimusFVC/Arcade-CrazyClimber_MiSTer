@@ -25,11 +25,10 @@ module cclimber_snd
     input               vol5_en,        // volume D4 (47K) fitted
     input               toprollr,       // Top Roller: AY 1.5 MHz, sample base AY / 4, ROM on index 7
 
-    input        [24:0] ioctl_addr,
-    input         [7:0] ioctl_dout,
-    input               smp_wr,         // ioctl 0B000-0CFFF
+    output       [12:0] smp_a,          // sample ROM block in the dispatcher rtl/cclimber_dispatcher.sv
+    input         [7:0] smp_q,
 
-    output chip_pool_pkg::aysel_i_t [0:0] aysel_i,      // shared AY (rtl/cclimber_board.sv)
+    output chip_pool_pkg::aysel_i_t [0:0] aysel_i,      // shared AY (rtl/cclimber_dispatcher.sv)
     input  chip_pool_pkg::aysel_o_t [0:0] aysel_o,
 
     output signed [15:0] audio
@@ -45,7 +44,7 @@ wire cen_ay_cc  = div[4:0] == 5'd0;
 wire cen_smp_cc = div[5:0] == 6'd0;
 wire cen_dc     = div == 10'd0;
 
-// Top Roller (MAME: clock 12 MHz / 8, sample clockdiv 4): 1.5 MHz = 125/4096 of 49.152 MHz, sample base = every 4th
+// Top Roller (AY 12 MHz / 8, sample clock divider 4): 1.5 MHz = 125/4096 of 49.152 MHz, sample base = every 4th
 reg [11:0] tr_frac = 12'd0;
 reg        tr_cen = 1'b0;
 reg  [1:0] tr_div = 2'd0;
@@ -94,17 +93,8 @@ end
 wire [7:0] smp_data;
 reg [13:0] smp_addr = 14'd0;
 
-dpram_dc #(.widthad_a(13)) smp_rom
-(
-    .clock_a(clk),
-    .address_a(toprollr ? ioctl_addr[12:0] : ioctl_addr[12:0] - 13'h1000),   // index 7 window is 8K aligned
-    .data_a(ioctl_dout),
-    .wren_a(smp_wr),
-
-    .clock_b(clk),
-    .address_b(smp_addr[13:1]),
-    .q_b(smp_data)
-);
+assign smp_a    = smp_addr[13:1];
+assign smp_data = smp_q;
 
 // Rate counter reloads from $A800 on carry: period = 256 - rate ticks of 768 kHz
 reg [7:0] rate_cnt = 8'd0;
@@ -148,7 +138,7 @@ always_ff @(posedge clk) dac_prod <= nib_w * vol_w;
 
 //------------------------------------------------------- Mix -----------------------------------------------------------------//
 
-// MAME mixes AY and DAC at 0.5 each; AC coupling approximated by the DC remover
+// AY and DAC at 0.5 each; AC coupling approximated by the DC remover
 wire [9:0]  ay_sum = {2'b00, ay_a} + {2'b00, ay_b} + {2'b00, ay_c};
 wire [15:0] mix    = {2'b00, ay_sum, 4'd0} + {1'b0, dac_prod[23:9]};
 

@@ -10,8 +10,8 @@
 
 module toprollr_video
 #(
-    parameter [7:0] X_START = 8'd0,     // MAME x of the first displayed pixel of a line
-    parameter [7:0] Y_OFS   = 8'd1      // MAME y rendered = displayed line + Y_OFS
+    parameter [7:0] X_START = 8'd0,     // reference x of the first displayed pixel of a line
+    parameter [7:0] Y_OFS   = 8'd1      // reference y rendered = displayed line + Y_OFS
 )
 (
     input               clk,            // 49.152 MHz
@@ -28,13 +28,13 @@ module toprollr_video
     output reg    [7:0] cpu_di,
     output              cpu_sel,
 
-    // ROM loading (ioctl index 7)
-    input        [24:0] ioctl_addr,
-    input         [7:0] ioctl_dout,
-    input               dl_tile0,
-    input               dl_tile1,
-    input               dl_bg0,
-    input               dl_bg1,
+    // ROM blocks (sprite planes, background planes) and RAMs live in the dispatcher rtl/cclimber_dispatcher.sv
+    output       [12:0] spr_rom_a,
+    input         [7:0] spr_p0, spr_p1,
+    output       [11:0] bg_rom_a,
+    input         [7:0] bg_p0, bg_p1,
+    output ram_pool_pkg::pram_i_t [3:0] pr_i,   // 0 sprite RAM, 1 bg video RAM, 2 bg colour RAM, 3 line buffer
+    input  ram_pool_pkg::pram_o_t [3:0] pr_o,
 
     output reg    [5:0] spr_pen = 6'd0,  // {colour, pixel}; pen = 0x00 + this
     output reg          spr_on = 1'b0,
@@ -55,23 +55,35 @@ wire [7:0] spr_q, bgv_q, bgc_q;
 reg  [7:0] spr_rd_addr = 8'd0;
 reg  [9:0] bg_ram_addr = 10'd0;
 
-dpram_dc #(.widthad_a(8)) spriteram
-(
-    .clock_a(clk), .address_a(spr_addr_cpu), .data_a(cpu_do), .wren_a(cpu_wr & spr_cs), .q_a(spr_q_cpu),
-    .clock_b(clk), .address_b(spr_rd_addr), .q_b(spr_q)
-);
+ram_pool_pkg::pram_i_t spr_i;
+assign spr_i.a_addr = 15'(spr_addr_cpu);
+assign spr_i.a_d    = cpu_do;
+assign spr_i.a_we   = cpu_wr & spr_cs;
+assign spr_i.b_addr = 15'(spr_rd_addr);
+assign spr_i.b_d    = 8'd0;
+assign spr_i.b_we   = 1'b0;
+assign spr_q_cpu = pr_o[0].a_q;
+assign spr_q = pr_o[0].b_q;
 
-dpram_dc #(.widthad_a(10)) bg_vram
-(
-    .clock_a(clk), .address_a(cpu_addr[9:0]), .data_a(cpu_do), .wren_a(cpu_wr & bgv_cs), .q_a(bgv_q_cpu),
-    .clock_b(clk), .address_b(bg_ram_addr), .q_b(bgv_q)
-);
+ram_pool_pkg::pram_i_t bgv_i;
+assign bgv_i.a_addr = 15'(cpu_addr[9:0]);
+assign bgv_i.a_d    = cpu_do;
+assign bgv_i.a_we   = cpu_wr & bgv_cs;
+assign bgv_i.b_addr = 15'(bg_ram_addr);
+assign bgv_i.b_d    = 8'd0;
+assign bgv_i.b_we   = 1'b0;
+assign bgv_q_cpu = pr_o[1].a_q;
+assign bgv_q = pr_o[1].b_q;
 
-dpram_dc #(.widthad_a(10)) bg_cram
-(
-    .clock_a(clk), .address_a(cpu_addr[9:0]), .data_a(cpu_do), .wren_a(cpu_wr & bgc_cs), .q_a(bgc_q_cpu),
-    .clock_b(clk), .address_b(bg_ram_addr), .q_b(bgc_q)
-);
+ram_pool_pkg::pram_i_t bgc_i;
+assign bgc_i.a_addr = 15'(cpu_addr[9:0]);
+assign bgc_i.a_d    = cpu_do;
+assign bgc_i.a_we   = cpu_wr & bgc_cs;
+assign bgc_i.b_addr = 15'(bg_ram_addr);
+assign bgc_i.b_d    = 8'd0;
+assign bgc_i.b_we   = 1'b0;
+assign bgc_q_cpu = pr_o[2].a_q;
+assign bgc_q = pr_o[2].b_q;
 
 always_comb begin
     if (spr_cs)      cpu_di = spr_q_cpu;
@@ -87,42 +99,24 @@ always_ff @(posedge clk) if (cpu_wr && bgv_cs && cpu_addr[9:0] == 10'd0) bg_scro
 
 // Sprite planes: a private copy of the "tile" region (MSB plane first), so the engine never contends with the playfield
 reg  [12:0] spr_rom_addr = 13'd0;
-wire  [7:0] spr_p0, spr_p1;
 
-dpram_dc #(.widthad_a(13)) spr_rom0
-(
-    .clock_a(clk), .address_a(ioctl_addr[12:0]), .data_a(ioctl_dout), .wren_a(dl_tile0),
-    .clock_b(clk), .address_b(spr_rom_addr), .q_b(spr_p0)
-);
+assign spr_rom_a = spr_rom_addr;
 
-dpram_dc #(.widthad_a(13)) spr_rom1
-(
-    .clock_a(clk), .address_a(ioctl_addr[12:0]), .data_a(ioctl_dout), .wren_a(dl_tile1),
-    .clock_b(clk), .address_b(spr_rom_addr), .q_b(spr_p1)
-);
+
 
 // Background planes: "gfx3", 2 x 4K, 512 characters
 reg  [11:0] bg_rom_addr = 12'd0;
-wire  [7:0] bg_p0, bg_p1;
 
-dpram_dc #(.widthad_a(12)) bg_rom0
-(
-    .clock_a(clk), .address_a(ioctl_addr[11:0]), .data_a(ioctl_dout), .wren_a(dl_bg0),
-    .clock_b(clk), .address_b(bg_rom_addr), .q_b(bg_p0)
-);
+assign bg_rom_a = bg_rom_addr;
 
-dpram_dc #(.widthad_a(12)) bg_rom1
-(
-    .clock_a(clk), .address_a(ioctl_addr[11:0]), .data_a(ioctl_dout), .wren_a(dl_bg1),
-    .clock_b(clk), .address_b(bg_rom_addr), .q_b(bg_p1)
-);
+
 
 //------------------------------------------------------- Line timing ---------------------------------------------------------//
 
 reg       hblank_d = 1'b1;
 reg       line_start = 1'b0;
 reg [7:0] cur_y = 8'd0;
-reg [7:0] mx = 8'd0;                       // MAME x being computed for the next output
+reg [7:0] mx = 8'd0;                       // reference x being computed for the next output
 reg [2:0] ph = 3'd0;                        // clock phase since ce_px
 
 always_ff @(posedge clk) begin
@@ -142,18 +136,21 @@ reg  [7:0] lb_wdata = 8'd0;
 reg        lb_we = 1'b0;
 wire [7:0] lb_q;
 
-dpram_dc #(.widthad_a(9)) linebuf
-(
-    .clock_a(clk), .address_a(lb_waddr), .data_a(lb_wdata), .wren_a(lb_we),
-    .clock_b(clk), .address_b({~wsel, mx}), .q_b(lb_q)
-);
+ram_pool_pkg::pram_i_t lbuf_i;
+assign lbuf_i.a_addr = 15'(lb_waddr);
+assign lbuf_i.a_d    = lb_wdata;
+assign lbuf_i.a_we   = lb_we;
+assign lbuf_i.b_addr = 15'({~wsel, mx});
+assign lbuf_i.b_d    = 8'd0;
+assign lbuf_i.b_we   = 1'b0;
+assign lb_q = pr_o[3].b_q;
 
 //------------------------------------------------------- Sprite engine -------------------------------------------------------//
 
 localparam S_IDLE = 3'd0, S_CLEAR = 3'd1, S_READ = 3'd2, S_CHECK = 3'd3, S_FETCH = 3'd4, S_DRAW = 3'd5;
 
 reg  [2:0] st = S_IDLE;
-reg  [7:0] ey = 8'd0;                       // MAME line being drawn
+reg  [7:0] ey = 8'd0;                       // reference line being drawn
 reg  [7:0] cx = 8'd0;
 reg  [5:0] sn = 6'd0;                       // sprite number, 55 down to 0
 reg  [2:0] rk = 3'd0;                       // sprite byte read step
@@ -166,7 +163,7 @@ reg  [1:0] fw = 2'd0;                       // ROM fetch wait
 reg  [2:0] pi = 3'd0;                       // pixel within half
 reg  [7:0] d0 = 8'd0, d1 = 8'd0;
 
-// MAME toprollr_draw_sprites: x = spr[3], y = 240 - spr[2]; flip screen mirrors both and inverts the flips
+// sprites: x = spr[3], y = 240 - spr[2]; flip screen mirrors both and inverts the flips
 wire [7:0] m_x    = flip_x ? (8'd240 - sx_raw) : sx_raw;
 wire [7:0] m_y0   = 8'd240 - sy_raw;
 wire [7:0] m_y    = flip_y ? (8'd240 - m_y0) : m_y0;
@@ -270,7 +267,7 @@ end
 
 //------------------------------------------------------- Background layer ----------------------------------------------------//
 
-// MAME toproller_get_bg_tile_info: code {col[6], vram}, colour col[3:0], TILE_FLIPX; one X scroll for the layer
+// bg tile: code {col[6], vram}, colour col[3:0], TILE_FLIPX; one X scroll for the layer
 wire [7:0] bx = (flip_x ? ~mx : mx) + bg_scroll;
 wire [7:0] by = flip_y ? ~cur_y : cur_y;
 reg  [7:0] bx_r = 8'd0;
@@ -294,7 +291,7 @@ end
 
 //------------------------------------------------------- Output ---------------------------------------------------------------//
 
-// MAME clips background and sprites to x 40..231 (24..215 when flipped); the playfield is not clipped
+// background and sprites clipped to x 40..231 (24..215 when flipped); the playfield is not clipped
 always_ff @(posedge clk) begin
     if (ce_px) begin
         spr_on  <= lb_q[7];
@@ -303,5 +300,8 @@ always_ff @(posedge clk) begin
         in_clip <= flip_x ? (mx >= 8'd24 && mx <= 8'd215) : (mx >= 8'd40 && mx <= 8'd231);
     end
 end
+
+// pool block bus
+assign pr_i = {lbuf_i, bgc_i, bgv_i, spr_i};
 
 endmodule
