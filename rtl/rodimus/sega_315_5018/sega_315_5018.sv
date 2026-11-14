@@ -2,6 +2,7 @@
 //
 //  Sega 315-5018 encrypted Z80 (Yamato, Top Roller) - opcode/data decryption
 //  Copyright (C) 2026 Rodimus
+//  SPDX-License-Identifier: BSD-3-Clause
 //
 //  Port of MAME src/devices/machine/segacrpt_device.cpp (BSD-3-Clause;
 //  Nicola Salmoria, David Haywood). Only D3/D5/D7 of 0000-7FFF change.

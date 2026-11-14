@@ -25,7 +25,7 @@
     <joystick>4-way</joystick>
     <special_controls></special_controls>
     <num_buttons>1</num_buttons>
-    <buttons names="Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause" default="A,B,X,Y,Select,Start,R,L"/>
+    <buttons names="Button 1,-,-,-,Coin,Start 1P,Start 2P,Pause" default="A,Select,Start,R,L"/>
 
     <switches default="80,00">
         <dip name="Lives" bits="0,1" ids="3,4,5,6"/>
@@ -36,7 +36,7 @@
         <dip name="Coin B" bits="8,10" ids="1C/1C,Invalid,3C/1C,4C/1C,1C/2C,1C/3C,2C/3C,Free Play"/>
     </switches>
 
-    <!-- Index 7: banks 0x0000 (3 x 16K), fixed 4000-5FFF 0xC000, CPU C000-FFFF 0x10000, tiles 0x14000, big sprite 0x18000, bg 0x1C000, samples 0x1E000, PROMs 0x20000 -->
+    <!-- Index 7: ROM -->
     <rom index="7" md5="none" zip="toprollr.zip">
         <part crc="ef789f00" name="2.f5"/>
         <part crc="94371cfb" name="8.f3"/>
@@ -63,7 +63,7 @@
         <part crc="abf4c5fb" name="prom.s9"/>
     </rom>
 
-    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <!-- Index 1: Config -->
     <rom index="1">
         <part>07 98 20</part>
     </rom>

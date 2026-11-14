@@ -35,7 +35,7 @@
         <dip name="Cabinet" bits="8" ids="Cocktail,Upright"/>
     </switches>
 
-    <!-- Index 0: CPU 0x0000, tiles 0x6000, big sprite 0xA000, samples 0xB000, palette PROMs 0xD000, decryption PROM 0xD100 -->
+    <!-- Index 0: ROM -->
     <rom index="0" md5="none" zip="ccboot2.zip|cclimber.zip">
         <part crc="b2b17e24" name="11.4k"/>
         <part crc="8382bc0f" name="10.4j"/>
@@ -62,12 +62,12 @@
         <part crc="9e11550d" name="ccboot.prm"/>
     </rom>
 
-    <!-- Index 1: control layout, board flags (see Arcade-CrazyClimber.sv) -->
+    <!-- Index 1: Config -->
     <rom index="1">
         <part>00 01</part>
     </rom>
 
-    <!-- Index 3: hiscore config (MAME hiscore.dat), index 4: saved scores -->
+    <!-- Index 3: Hiscore -->
     <rom index="3" md5="none">
         <part>
             00 25 1F 62 00 FF 00 02 00 02 00 01 11 11 00 00
@@ -83,13 +83,13 @@
             00 00 80 CD 00 0A 15 52
         </part>
     </rom>
+    <!-- Index 4: NVRAM -->
     <rom index="4"></rom>
     <nvram index="4" size="65"></nvram>
 
     <remark>Crazy Climber (Bootleg Set 2)</remark>
     <mratimestamp>20260927000000</mratimestamp>
-    <!-- Index 10: MAME artwork, layout table (from default.lay) + PNGs from the artwork zip, as-is -->
-    <!-- OSD Artwork: View 1 = Upright Artwork Nichibitsu, View 2 = Taito Upright Artwork, View 3 = Bootleg Upright Artwork, View 4 = Hausjam Artwork -->
+    <!-- Index 10: Artwork -->
     <rom index="10" md5="none" zip="/mame-artwork/cclimber.zip">
         <part>
             41 57 04 00 04 00 01 01 E0 00 00 00 00 00 00 00 FC 02 08 03 7C 00 2C 01 00 02 80 01 00 58 01 00

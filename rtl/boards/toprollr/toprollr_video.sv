@@ -1,39 +1,30 @@
-//============================================================================
-//
-//  Top Roller (Jaleco 8307-B) video: 56-sprite line engine + scrolling background
+//  Based on MAME cclimber.cpp (Nicola Salmoria, BSD-3-Clause)
 //  Copyright (C) 2026 Rodimus
-//
-//  BEST EFFORT WITHOUT SCHEMATICS AVAILABLE. Behaviour per MAME cclimber.cpp
-//  (Nicola Salmoria); the 256x2 PROM at S9 is not emulated, as in MAME.
-//
-//============================================================================
 
 module toprollr_video
 #(
-    parameter [7:0] X_START = 8'd0,     // reference x of the first displayed pixel of a line
-    parameter [7:0] Y_OFS   = 8'd1      // reference y rendered = displayed line + Y_OFS
+    parameter [7:0] X_START = 8'd0,
+    parameter [7:0] Y_OFS   = 8'd1
 )
 (
-    input               clk,            // 49.152 MHz
+    input               clk,
     input               ce_px,
     input               hblank,
-    input         [7:0] line_y,         // raw V counter of the line being displayed
-    input               flip_x,         // effective flips (game latch ^ CRT flip)
+    input         [7:0] line_y,
+    input               flip_x,
     input               flip_y,
 
-    // CPU: sprite RAM 9880-995F, bg video RAM 8C00-8FFF, bg colour RAM 9400-97FF
     input        [15:0] cpu_addr,
     input         [7:0] cpu_do,
     input               cpu_wr,
     output reg    [7:0] cpu_di,
     output              cpu_sel,
 
-    // ROM blocks (sprite planes, background planes) and RAMs live in the dispatcher rtl/cclimber_dispatcher.sv
     output       [12:0] spr_rom_a,
     input         [7:0] spr_p0, spr_p1,
     output       [11:0] bg_rom_a,
     input         [7:0] bg_p0, bg_p1,
-    output ram_pool_pkg::pram_i_t [3:0] pr_i,   // 0 sprite RAM, 1 bg video RAM, 2 bg colour RAM, 3 line buffer
+    output ram_pool_pkg::pram_i_t [3:0] pr_i,
     input  ram_pool_pkg::pram_o_t [3:0] pr_o,
 
     output reg    [5:0] spr_pen = 6'd0,  // {colour, pixel}; pen = 0x00 + this
@@ -42,11 +33,9 @@ module toprollr_video
     output reg          in_clip = 1'b0
 );
 
-//------------------------------------------------------- CPU-side RAMs -------------------------------------------------------//
-
 wire spr_cs = (cpu_addr >= 16'h9880) && (cpu_addr < 16'h9960);
-wire bgv_cs = cpu_addr[15:10] == 6'b100011;        // 8C00-8FFF
-wire bgc_cs = cpu_addr[15:10] == 6'b100101;        // 9400-97FF
+wire bgv_cs = cpu_addr[15:10] == 6'b100011;
+wire bgc_cs = cpu_addr[15:10] == 6'b100101;
 assign cpu_sel = spr_cs | bgv_cs | bgc_cs;
 
 wire [7:0] spr_addr_cpu = cpu_addr[7:0] - 8'h80;
@@ -56,30 +45,30 @@ reg  [7:0] spr_rd_addr = 8'd0;
 reg  [9:0] bg_ram_addr = 10'd0;
 
 ram_pool_pkg::pram_i_t spr_i;
-assign spr_i.a_addr = 15'(spr_addr_cpu);
+assign spr_i.a_addr = 16'(spr_addr_cpu);
 assign spr_i.a_d    = cpu_do;
 assign spr_i.a_we   = cpu_wr & spr_cs;
-assign spr_i.b_addr = 15'(spr_rd_addr);
+assign spr_i.b_addr = 16'(spr_rd_addr);
 assign spr_i.b_d    = 8'd0;
 assign spr_i.b_we   = 1'b0;
 assign spr_q_cpu = pr_o[0].a_q;
 assign spr_q = pr_o[0].b_q;
 
 ram_pool_pkg::pram_i_t bgv_i;
-assign bgv_i.a_addr = 15'(cpu_addr[9:0]);
+assign bgv_i.a_addr = 16'(cpu_addr[9:0]);
 assign bgv_i.a_d    = cpu_do;
 assign bgv_i.a_we   = cpu_wr & bgv_cs;
-assign bgv_i.b_addr = 15'(bg_ram_addr);
+assign bgv_i.b_addr = 16'(bg_ram_addr);
 assign bgv_i.b_d    = 8'd0;
 assign bgv_i.b_we   = 1'b0;
 assign bgv_q_cpu = pr_o[1].a_q;
 assign bgv_q = pr_o[1].b_q;
 
 ram_pool_pkg::pram_i_t bgc_i;
-assign bgc_i.a_addr = 15'(cpu_addr[9:0]);
+assign bgc_i.a_addr = 16'(cpu_addr[9:0]);
 assign bgc_i.a_d    = cpu_do;
 assign bgc_i.a_we   = cpu_wr & bgc_cs;
-assign bgc_i.b_addr = 15'(bg_ram_addr);
+assign bgc_i.b_addr = 16'(bg_ram_addr);
 assign bgc_i.b_d    = 8'd0;
 assign bgc_i.b_we   = 1'b0;
 assign bgc_q_cpu = pr_o[2].a_q;
@@ -91,33 +80,22 @@ always_comb begin
     else             cpu_di = bgc_q_cpu;
 end
 
-// bg_vram[0] is the whole-layer X scroll
 reg [7:0] bg_scroll = 8'd0;
 always_ff @(posedge clk) if (cpu_wr && bgv_cs && cpu_addr[9:0] == 10'd0) bg_scroll <= cpu_do;
 
-//------------------------------------------------------- Graphics ROMs -------------------------------------------------------//
-
-// Sprite planes: a private copy of the "tile" region (MSB plane first), so the engine never contends with the playfield
 reg  [12:0] spr_rom_addr = 13'd0;
 
 assign spr_rom_a = spr_rom_addr;
 
-
-
-// Background planes: "gfx3", 2 x 4K, 512 characters
 reg  [11:0] bg_rom_addr = 12'd0;
 
 assign bg_rom_a = bg_rom_addr;
 
-
-
-//------------------------------------------------------- Line timing ---------------------------------------------------------//
-
 reg       hblank_d = 1'b1;
 reg       line_start = 1'b0;
 reg [7:0] cur_y = 8'd0;
-reg [7:0] mx = 8'd0;                       // reference x being computed for the next output
-reg [2:0] ph = 3'd0;                        // clock phase since ce_px
+reg [7:0] mx = 8'd0;
+reg [2:0] ph = 3'd0;
 
 always_ff @(posedge clk) begin
     hblank_d   <= hblank;
@@ -128,8 +106,6 @@ always_ff @(posedge clk) begin
     if (ce_px) mx <= hblank ? X_START : mx + 8'd1;
 end
 
-//------------------------------------------------------- Sprite line buffer (ping-pong) --------------------------------------//
-
 reg        wsel = 1'b0;
 reg  [8:0] lb_waddr = 9'd0;
 reg  [7:0] lb_wdata = 8'd0;
@@ -137,33 +113,30 @@ reg        lb_we = 1'b0;
 wire [7:0] lb_q;
 
 ram_pool_pkg::pram_i_t lbuf_i;
-assign lbuf_i.a_addr = 15'(lb_waddr);
+assign lbuf_i.a_addr = 16'(lb_waddr);
 assign lbuf_i.a_d    = lb_wdata;
 assign lbuf_i.a_we   = lb_we;
-assign lbuf_i.b_addr = 15'({~wsel, mx});
+assign lbuf_i.b_addr = 16'({~wsel, mx});
 assign lbuf_i.b_d    = 8'd0;
 assign lbuf_i.b_we   = 1'b0;
 assign lb_q = pr_o[3].b_q;
 
-//------------------------------------------------------- Sprite engine -------------------------------------------------------//
-
 localparam S_IDLE = 3'd0, S_CLEAR = 3'd1, S_READ = 3'd2, S_CHECK = 3'd3, S_FETCH = 3'd4, S_DRAW = 3'd5;
 
 reg  [2:0] st = S_IDLE;
-reg  [7:0] ey = 8'd0;                       // reference line being drawn
+reg  [7:0] ey = 8'd0;
 reg  [7:0] cx = 8'd0;
-reg  [5:0] sn = 6'd0;                       // sprite number, 55 down to 0
-reg  [2:0] rk = 3'd0;                       // sprite byte read step
+reg  [5:0] sn = 6'd0;
+reg  [2:0] rk = 3'd0;
 reg  [7:0] a0 = 8'd0, a1 = 8'd0, sy_raw = 8'd0, sx_raw = 8'd0;
 reg  [7:0] sx = 8'd0;
 reg  [3:0] gy = 4'd0;
 reg        fx = 1'b0;
 reg        half = 1'b0;
-reg  [1:0] fw = 2'd0;                       // ROM fetch wait
-reg  [2:0] pi = 3'd0;                       // pixel within half
+reg  [1:0] fw = 2'd0;
+reg  [2:0] pi = 3'd0;
 reg  [7:0] d0 = 8'd0, d1 = 8'd0;
 
-// sprites: x = spr[3], y = 240 - spr[2]; flip screen mirrors both and inverts the flips
 wire [7:0] m_x    = flip_x ? (8'd240 - sx_raw) : sx_raw;
 wire [7:0] m_y0   = 8'd240 - sy_raw;
 wire [7:0] m_y    = flip_y ? (8'd240 - m_y0) : m_y0;
@@ -197,7 +170,6 @@ always_ff @(posedge clk) begin
             end
         end
 
-        // Four byte reads: address at step k, data one clock later
         S_READ: begin
             rk <= rk + 3'd1;
             spr_rd_addr <= {sn, rk[1:0]};
@@ -227,7 +199,6 @@ always_ff @(posedge clk) begin
             end
         end
 
-        // byte = code*32 + (gy>=8 ? 16 : 0) + (column half ? 8 : 0) + (gy & 7); the drawn half flips with X
         S_FETCH: begin
             spr_rom_addr <= {code, gy[3], half ^ fx, gy[2:0]};
             fw <= fw + 2'd1;
@@ -265,9 +236,6 @@ always_ff @(posedge clk) begin
     endcase
 end
 
-//------------------------------------------------------- Background layer ----------------------------------------------------//
-
-// bg tile: code {col[6], vram}, colour col[3:0], TILE_FLIPX; one X scroll for the layer
 wire [7:0] bx = (flip_x ? ~mx : mx) + bg_scroll;
 wire [7:0] by = flip_y ? ~cur_y : cur_y;
 reg  [7:0] bx_r = 8'd0;
@@ -289,9 +257,6 @@ always_ff @(posedge clk) begin
     endcase
 end
 
-//------------------------------------------------------- Output ---------------------------------------------------------------//
-
-// background and sprites clipped to x 40..231 (24..215 when flipped); the playfield is not clipped
 always_ff @(posedge clk) begin
     if (ce_px) begin
         spr_on  <= lb_q[7];
@@ -301,7 +266,6 @@ always_ff @(posedge clk) begin
     end
 end
 
-// pool block bus
 assign pr_i = {lbuf_i, bgc_i, bgv_i, spr_i};
 
 endmodule

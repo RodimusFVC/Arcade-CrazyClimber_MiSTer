@@ -1,42 +1,33 @@
-//============================================================================
-//
-//  Crazy Climber board (Nichibutsu CCG-1/CCG-2, Crazy Kong derivatives)
-//  and Swimmer board (Tehkan / Centuri A102-401 + B102-402)
+//  Based on MAME cclimber.cpp (Nicola Salmoria, BSD-3-Clause)
 //  Copyright (C) 2026 Rodimus
-//
-//  Video timing and scanout pipeline ported from Crazy Climber FPGA by
-//  Dar (darfpga@aol.fr, http://darfpga.blogspot.fr)
-//  Memory maps, opcode decryption and sound model per MAME cclimber.cpp
-//  (Nicola Salmoria)
-//
-//============================================================================
+// Video timing and scanout pipeline from Crazy Climber FPGA by Dar (darfpga@aol.fr, http://darfpga.blogspot.fr)
 
 module cclimber_main
 (
-    input               clk,            // 49.152 MHz
-    input               reset,          // active high
-    input               ce12,           // 12.288 MHz enable = 2x pixel
+    input               clk,
+    input               reset,
+    input               ce12,
     input               pause,
 
-    input               swimmer,        // Swimmer board (3bpp, sound CPU)
-    input               au,             // Au: Swimmer board with 8K planes and palette RAM
-    input               cannonb,        // Cannon Ball: CK board, chars/sprites split per plane, one flip bit
-    input               cb_xor,         // Cannon Ball set 1: first program ROM XORed by address
-    input               tangramq,       // Tangram Q: SYSTEM ports at 8000/8020, SNK sound board, 4K big sprite planes
-    input               yamato,         // Yamato: Sega 315-5018 CPU, 12-bit palette, gradient background, polled sound board
-    input               toprollr,       // Top Roller: banked 315-5018 CPU, extra bg layer, 56 sprites (toprollr_video.sv)
-    input               bagmanf,        // Le Bagnard: Bagman map on the CK board, TMS5110 speech
-    input               decrypt_en,     // dm7052 opcode decryption PROM fitted
-    input         [1:0] rom_xor,        // 0 none, 1 rpatrol, 2 ckongb, 3 dking
-    input               vol5_en,        // volume D4 resistor fitted
-    input               nmi_q3,         // latch Q3 also drives the NMI mask (ckongb bootleg)
+    input               swimmer,
+    input               au,
+    input               cannonb,
+    input               cb_xor,
+    input               tangramq,
+    input               yamato,
+    input               toprollr,
+    input               bagmanf,
+    input               decrypt_en,
+    input         [1:0] rom_xor,
+    input               vol5_en,
+    input               nmi_q3,
 
-    input         [7:0] in_p1,          // $A000
-    input         [7:0] in_p2,          // $A800
-    input         [7:0] in_dsw,         // $B000
-    input         [7:0] in_sys,         // $B800
-    input         [7:0] in_sys1,        // $8000 (Tangram Q)
-    input         [7:0] in_sys2,        // $8020 (Tangram Q)
+    input         [7:0] in_p1,
+    input         [7:0] in_p2,
+    input         [7:0] in_dsw,
+    input         [7:0] in_sys,
+    input         [7:0] in_sys1,
+    input         [7:0] in_sys2,
 
     input        [24:0] ioctl_addr,
     input         [7:0] ioctl_dout,
@@ -50,22 +41,20 @@ module cclimber_main
     output reg          video_vblank = 1'b1,
     output              ce_pix,
 
-    input               crt_flip,       // OSD CRT Flip, XORed with the game's flip latch
-    input  signed [3:0] h_adj,          // CRT position: HSYNC moved 2 pixels per step
-    input  signed [3:0] v_adj,          //               VSYNC moved 1 line per step
+    input               crt_flip,
+    input  signed [3:0] h_adj,
+    input  signed [3:0] v_adj,
 
     output              flip_x,
     output              flip_y,
 
     output signed [15:0] audio,
 
-    // hiscore: second port on the work RAMs and video RAM (CPU addresses)
     input        [15:0] hs_address,
     input         [7:0] hs_data_in,
     output        [7:0] hs_data_out,
     input               hs_write,
 
-    // CPUs, AYs, TMS5110, ROM blocks and board RAMs live in the dispatcher rtl/cclimber_dispatcher.sv
     input               dl_dprom, dl_pal, dl_pal_lo, dl_pal_hi, dl_bspal, dl_tr_pal, dl_ym_pal_b, dl_sprom,
 
     output chip_pool_pkg::z80_i_t         z80_0_i,
@@ -76,8 +65,12 @@ module cclimber_main
     input  chip_pool_pkg::aysel_o_t [1:0] aysel_o,
     output chip_pool_pkg::tms5110_i_t     tms_i,
     input  chip_pool_pkg::tms5110_o_t     tms_o,
+    output chip_pool_pkg::sega_315_5018_i_t sega_315_5018_0_i,
+    input  chip_pool_pkg::sega_315_5018_o_t sega_315_5018_0_o,
+    output chip_pool_pkg::tmsprom_i_t     tmsprom_0_i,
+    input  chip_pool_pkg::tmsprom_o_t     tmsprom_0_o,
 
-    output       [14:0] prog_a,         // ROM block read ports
+    output       [14:0] prog_a,
     input         [7:0] prog_q,
     output       [12:0] prog_hi_a,
     input         [7:0] prog_hi_q,
@@ -91,8 +84,6 @@ module cclimber_main
     input         [7:0] bs0_q, bs1_q, bs2_q,
     output       [11:0] grad_a,
     input         [7:0] grad0_q, grad1_q,
-    output       [12:0] spch_a,
-    input         [7:0] spch_q,
     output       [12:0] smp_a,
     input         [7:0] smp_q,
     output       [12:0] tr_spr_a,
@@ -100,17 +91,12 @@ module cclimber_main
     output       [11:0] tr_bg_a,
     input         [7:0] tr_bg0_q, tr_bg1_q,
 
-    output ram_pool_pkg::pram_i_t [6:0] pr_i,   // dual-port blocks: 0 work RAM, 1 RAM 8000, 2 tile RAM, 3-6 Top Roller
+    output ram_pool_pkg::pram_i_t [6:0] pr_i,
     input  ram_pool_pkg::pram_o_t [6:0] pr_o,
-    output ram_pool_pkg::pram_i_t [3:0] sp_i,   // single-port blocks (port A): 0 colour RAM, 1 sprite line, 2 big sprite
-    input  ram_pool_pkg::pram_o_t [3:0] sp_o    //   RAM, 3 sound board RAM
+    output ram_pool_pkg::pram_i_t [3:0] sp_i,
+    input  ram_pool_pkg::pram_o_t [3:0] sp_o
 );
 
-// ROM load map moved to the dispatcher (rtl/cclimber_dispatcher.sv); the board gets the PROM strobes
-
-//------------------------------------------------------- Video timing --------------------------------------------------------//
-
-// Both boards: MCLK = 18.432/3, H counts 128..511 (384), V counts 248..511 (264)
 reg ena_pixel = 1'b0;
 always_ff @(posedge clk) if (ce12) ena_pixel <= ~ena_pixel;
 
@@ -121,10 +107,8 @@ reg [8:0] hcnt   = 9'd511;
 reg [8:0] vcnt   = 9'd511;
 reg [8:0] vcnt_r = 9'd511;
 
-// CRT position: only the sync pulses move, blanking stays put. HSYNC 175 + 2h (inside hblank 137-263); VSYNC 3 lines
-// from line index 263 (vcnt 511) + v, wrapping at 264 (inside vblank 497-272)
 wire [8:0] hs_on    = 9'd175 + {{4{h_adj[3]}}, h_adj, 1'b0};
-wire [8:0] v_line   = vcnt - 9'd248;                                // 0-263
+wire [8:0] v_line   = vcnt - 9'd248;
 wire [8:0] vs_start = v_adj[3] ? 9'd263 + {{5{1'b1}}, v_adj} : v_adj == 4'sd0 ? 9'd263 : {5'd0, v_adj} - 9'd1;
 wire [9:0] vs_dist  = v_line >= vs_start ? {1'b0, v_line - vs_start} : {1'b0, v_line} + 10'd264 - {1'b0, vs_start};
 
@@ -144,7 +128,6 @@ always_ff @(posedge clk) begin
 
         video_vs <= vs_dist >= 10'd3;
 
-        // +8 for the shift register, +1 pixel; vcnt has already stepped, so rows shown are 272..495 (y 16..239)
         if (hcnt == 9'd137) video_hblank <= 1'b1;
         else if (hcnt == 9'd264) begin
             video_hblank <= 1'b0;
@@ -161,27 +144,19 @@ wire [2:0] x_pixel   = hcnt[2:0];
 wire [4:0] y_tile    = vcnt_r[7:3];
 wire [2:0] y_pixel   = vcnt_r[2:0];
 
-// HINV/VINV: the '86 banks invert the counters feeding video addressing; blanking and NMI stay raw
 wire       hinv      = flip_x ^ crt_flip;
 wire       vinv      = flip_y ^ crt_flip;
 wire [7:0] y_line    = vcnt_r[7:0] ^ {8{vinv}};
 wire [4:0] x_tile_v  = x_tile ^ {5{hinv}};
 
-// Q0 NMI enable, Q1 flip X, Q2 flip Y; Q4 sample trigger (CC) / Q3 side background, Q4 palette bank (Swimmer)
 reg [7:0] mainlatch = 8'h00;
 assign flip_x = mainlatch[1];
 assign flip_y = cannonb ? mainlatch[1] : mainlatch[2];
 wire   sidebg_en  = swimmer & ~au & mainlatch[3];
 wire   pal_bank   = swimmer & ~au & mainlatch[4];
 
-// Z80 clock is ~H0: it rises as hcnt steps odd -> even
 wire cpu_rise = ce_px &  hcnt[0];
 wire cpu_fall = ce_px & ~hcnt[0];
-
-/////////////////////////////  Shared CPU / sound chip pool  /////////////////////////////
-
-// Only one board family runs at a time (selected by swimmer / tangramq / yamato), so the CPUs and AYs are instanced
-// once here and the active board drives them (rtl/chip_pool_pkg.sv). Pool chips take the core reset.
 
 wire [15:0] cpu_addr;
 wire  [7:0] cpu_do;
@@ -190,7 +165,6 @@ wire        cpu_m1_n, cpu_mreq_n, cpu_iorq_n, cpu_rd_n, cpu_wr_n;
 reg         cpu_nmi_n = 1'b1;
 reg         cpu_int_n = 1'b1;
 
-// z80_0: main CPU, every board
 assign z80_0_i.ce    = cpu_rise & ~pause;
 assign z80_0_i.int_n = cpu_int_n;
 assign z80_0_i.nmi_n = cpu_nmi_n;
@@ -204,57 +178,42 @@ assign cpu_iorq_n = z80_0_o.iorq_n;
 assign cpu_rd_n   = z80_0_o.rd_n;
 assign cpu_wr_n   = z80_0_o.wr_n;
 
-
-
-
-// z80_1: sound CPU, Swimmer board (Swimmer, Guzzler, Au), Tangram Q, Yamato
 chip_pool_pkg::z80_i_t sw_z80_1_i, tq_z80_1_i, ym_z80_1_i;
 assign z80_1_i = swimmer ? sw_z80_1_i : tangramq ? tq_z80_1_i : ym_z80_1_i;
 
-// AY-3-8910 x 2: aysel 0 = CC sound board (Crazy Climber, Crazy Kong, River Patrol, Cannon Ball, Top Roller, Le Bagnard)
-// or AY1 of the Swimmer / Tangram Q / Yamato sound boards; aysel 1 = their AY2
 chip_pool_pkg::aysel_i_t [0:0] cc_aysel_i;
 chip_pool_pkg::aysel_i_t [1:0] sw_aysel_i, tq_aysel_i, ym_aysel_i;
 assign aysel_i[0] = swimmer ? sw_aysel_i[0] : tangramq ? tq_aysel_i[0] : yamato ? ym_aysel_i[0] : cc_aysel_i[0];
 assign aysel_i[1] = swimmer ? sw_aysel_i[1] : tangramq ? tq_aysel_i[1] : ym_aysel_i[1];
 
-/////////////////////////////  Shared ROM blocks  /////////////////////////////
-
-// rom0: sound CPU program. Swimmer board index 2 0A000-0AFFF, Tangram Q index 5 0C000-0DFFF, Yamato index 6 0E000-0E7FF
 wire [12:0] sw_r0a, tq_r0a, ym_r0a;
 assign rom0_a = swimmer ? sw_r0a : tangramq ? tq_r0a : ym_r0a;
-
-//------------------------------------------------------- Address decode ------------------------------------------------------//
 
 wire       mem_wr   = ~cpu_mreq_n & ~cpu_wr_n;
 wire [4:0] a_hi     = cpu_addr[15:11];
 
-// CC: ROM 0000-5FFF, RAM 6000-6FFF.  Swimmer: ROM 0000-7FFF + E000-FFFF, RAM C000-CFFF (Guzzler)
 wire rom_cs   = toprollr ? ((cpu_addr < 16'h6000) | (cpu_addr[15:14] == 2'b11)) :
                 swimmer ? (~cpu_addr[15] | (cpu_addr[15:13] == 3'b111)) :
                 yamato  ? ((cpu_addr < 16'h6000) | (cpu_addr[15:12] == 4'h7)) : (cpu_addr < 16'h6000);
 wire ram6_cs  = cpu_addr[15:12] == (swimmer ? 4'hC : 4'h6);
-wire ram8_cs  = a_hi == 5'b10000;                                   // 8000-87FF
+wire ram8_cs  = a_hi == 5'b10000;
 wire bsram_cs = swimmer ? (a_hi == 5'b10001) : (cpu_addr[15:8] == 8'h88);
-wire tile_cs  = a_hi == 5'b10010;                                   // 9000-97FF
-wire color_cs = a_hi == 5'b10011;                                   // 9800-9FFF
+wire tile_cs  = a_hi == 5'b10010;
+wire color_cs = a_hi == 5'b10011;
 
-wire latch_we = mem_wr & (a_hi == 5'b10100);                        // A000-A007 LS259
-wire a800_we  = mem_wr & (a_hi == 5'b10101);                        // sample rate / sound latch
-wire b000_we  = mem_wr & (a_hi == 5'b10110);                        // sample volume
-wire b800_we  = mem_wr & (a_hi == 5'b10111);                        // background colour (Swimmer)
-
-//------------------------------------------------------- Program ROM ---------------------------------------------------------//
+wire latch_we = mem_wr & (a_hi == 5'b10100);
+wire a800_we  = mem_wr & (a_hi == 5'b10101);
+wire b000_we  = mem_wr & (a_hi == 5'b10110);
+wire b800_we  = mem_wr & (a_hi == 5'b10111);
 
 wire [7:0] rom_lo_do, rom_hi_do;
 
-assign prog_a    = toprollr ? {1'b0, cpu_addr[13:0]} : cpu_addr[14:0];   // Top Roller: C000-FFFF
+assign prog_a    = toprollr ? {1'b0, cpu_addr[13:0]} : cpu_addr[14:0];
 assign rom_lo_do = prog_q;
 
 assign prog_hi_a = cpu_addr[12:0];
 assign rom_hi_do = prog_hi_q;
 
-// Top Roller: 0000-3FFF from bank {Q6,Q5}, 4000-5FFF fixed (the slice common to every bank), C000-FFFF plain
 wire [7:0]  tr_bank_do;
 wire [15:0] tr_bank_addr = {(cpu_addr[14] ? 2'b11 : {mainlatch[6], mainlatch[5]}), cpu_addr[13:0]};
 
@@ -264,7 +223,6 @@ assign tr_bank_do = tr_bank_q;
 wire tr_banked = toprollr & (cpu_addr < 16'h6000);
 wire [7:0] rom_do = tr_banked ? tr_bank_do : toprollr ? rom_lo_do : cpu_addr[15] ? rom_hi_do : rom_lo_do;
 
-// Bootleg data-bus inverters: River Patrol, Crazy Kong bootleg, Donkey King
 reg [7:0] rom_xor_mask;
 always_comb begin
     rom_xor_mask = 8'h00;
@@ -276,7 +234,6 @@ always_comb begin
                   rom_xor_mask = 8'hFF;
         default: ;
     endcase
-    // Cannon Ball set 1: only 0000-0FFF, key picked by A9/A7
     if (cb_xor && cpu_addr < 16'h1000)
         case ({cpu_addr[9], cpu_addr[7]})
             2'd0: rom_xor_mask = 8'h92;
@@ -288,7 +245,6 @@ end
 
 wire [7:0] rom_src = rom_do ^ rom_xor_mask;
 
-// Opcode decryption PROM (dm7052, 256x4) in the CPU block, indexed by data bits and A0
 reg  [3:0] dprom [256];
 always_ff @(posedge clk) if (dl_dprom) dprom[ioctl_addr[7:0]] <= ioctl_dout[3:0];
 
@@ -296,24 +252,16 @@ wire [7:0] dp_idx = {1'b0, cpu_addr[0], rom_src[7], rom_src[1], rom_src[4], rom_
 wire [3:0] dp     = dprom[dp_idx];
 wire [7:0] rom_dec = (rom_src & 8'hAA) | {1'b0, dp[2], 1'b0, dp[3], 1'b0, dp[1], 1'b0, dp[0]};
 
-// Sega 315-5018 (Yamato): opcode table on M1 fetches, data table on every other ROM read
 wire [7:0] rom_5018;
-sega_315_5018 dec_5018
-(
-    .src(rom_src),
-    .addr(cpu_addr),
-    .m1(~cpu_m1_n),
-    .dout(rom_5018)
-);
+assign sega_315_5018_0_i.src  = rom_src;
+assign sega_315_5018_0_i.addr = cpu_addr;
+assign sega_315_5018_0_i.m1   = ~cpu_m1_n;
+assign rom_5018 = sega_315_5018_0_o.dout;
 
-// Top Roller: only the banked window is encrypted, table row from the address within the bank (= CPU address)
 wire [7:0] rom_data = (yamato | tr_banked) ? rom_5018 : (decrypt_en & ~cpu_m1_n) ? rom_dec : rom_src;
-
-//------------------------------------------------------- Work RAM ------------------------------------------------------------//
 
 wire [7:0] ram6_do, ram8_do;
 
-// hiscore port B: 6000/C000 work RAM, 8000 RAM, 9000 video RAM
 wire       hs_ram6 = hs_address[15:12] == 4'h6 || hs_address[15:12] == 4'hC;
 wire       hs_ram8 = hs_address[15:11] == 5'b10000;
 wire       hs_tile = hs_address[15:11] == 5'b10010;
@@ -323,27 +271,24 @@ always_ff @(posedge clk) hs_sel <= hs_ram6 ? 2'd0 : hs_ram8 ? 2'd1 : 2'd2;
 assign hs_data_out = (hs_sel == 2'd0) ? hs_ram6_do : (hs_sel == 2'd1) ? hs_ram8_do : hs_tile_do;
 
 ram_pool_pkg::pram_i_t ram6_i;
-assign ram6_i.a_addr = 15'(cpu_addr[11:0]);
+assign ram6_i.a_addr = 16'(cpu_addr[11:0]);
 assign ram6_i.a_d    = cpu_do;
 assign ram6_i.a_we   = mem_wr & ram6_cs;
-assign ram6_i.b_addr = 15'(hs_address[11:0]);
+assign ram6_i.b_addr = 16'(hs_address[11:0]);
 assign ram6_i.b_d    = hs_data_in;
 assign ram6_i.b_we   = hs_write & hs_ram6;
 assign ram6_do = pr_o[0].a_q;
 assign hs_ram6_do = pr_o[0].b_q;
 
-// CC: 1K mirrored through 8000-87FF.  Swimmer: 2K
 ram_pool_pkg::pram_i_t ram8_i;
-assign ram8_i.a_addr = 15'({swimmer & cpu_addr[10], cpu_addr[9:0]});
+assign ram8_i.a_addr = 16'({swimmer & cpu_addr[10], cpu_addr[9:0]});
 assign ram8_i.a_d    = cpu_do;
 assign ram8_i.a_we   = mem_wr & ram8_cs & ~tangramq;
-assign ram8_i.b_addr = 15'({swimmer & hs_address[10], hs_address[9:0]});
+assign ram8_i.b_addr = 16'({swimmer & hs_address[10], hs_address[9:0]});
 assign ram8_i.b_d    = hs_data_in;
 assign ram8_i.b_we   = hs_write & hs_ram8 & ~tangramq;
 assign ram8_do = pr_o[1].a_q;
 assign hs_ram8_do = pr_o[1].b_q;
-
-//------------------------------------------------------- CPU read mux --------------------------------------------------------//
 
 wire [7:0] ay_dout;
 wire [7:0] bs_ram_do, tile_ram_do, color_ram_do;
@@ -352,7 +297,7 @@ wire       tr_cpu_sel;
 
 always_comb begin
     if (~cpu_iorq_n)
-        cpu_di = (~cpu_m1_n | swimmer | yamato) ? 8'hFF : ay_dout;   // interrupt acknowledge reads FF (RST 38)
+        cpu_di = (~cpu_m1_n | swimmer | yamato) ? 8'hFF : ay_dout;
     else if (toprollr && tr_cpu_sel)
         cpu_di = tr_cpu_di;
     else if (rom_cs)
@@ -362,10 +307,10 @@ always_comb begin
     else case (a_hi)
         5'b10000: cpu_di = bagmanf ? in_p1 : tangramq ? (cpu_addr[5] ? in_sys2 : in_sys1) : ram8_do;
         5'b10001: cpu_di = (bagmanf && cpu_addr[10:0] == 11'd0) ? in_p2 :
-                           cannonb ? 8'h00 : bs_ram_do;   // Cannon Ball big sprite RAM is write-only
+                           cannonb ? 8'h00 : bs_ram_do;
         5'b10010: cpu_di = tile_ram_do;
         5'b10011: cpu_di = (bagmanf && cpu_addr[10:0] == 11'd0) ? in_sys : color_ram_do;
-        5'b10100: cpu_di = bagmanf ? 8'h3F : in_p1;       // Le Bagnard: fixed 0x3F
+        5'b10100: cpu_di = bagmanf ? 8'h3F : in_p1;
         5'b10101: cpu_di = bagmanf ? 8'hFF : in_p2;
         5'b10110: cpu_di = in_dsw;
         5'b10111: cpu_di = bagmanf ? 8'hFF : in_sys;
@@ -373,9 +318,6 @@ always_comb begin
     endcase
 end
 
-//------------------------------------------------------- LS259 latch / NMI ---------------------------------------------------//
-
-// NMI mask follows the last write to Q0 (or Q3 on the ckongb board)
 reg nmi_en = 1'b0;
 
 always_ff @(posedge clk) begin
@@ -389,7 +331,6 @@ always_ff @(posedge clk) begin
     end
 end
 
-// NMI latched at line 224 and held until the mask is cleared
 wire vbl_line = y_tile == 5'b11100 && y_pixel == 3'b000;
 always_ff @(posedge clk) begin
     if (!nmi_en)
@@ -398,7 +339,6 @@ always_ff @(posedge clk) begin
         cpu_nmi_n <= 1'b0;
 end
 
-// Le Bagnard: the mask gates an IRQ instead, held until acknowledged
 reg vbl_line_d = 1'b0;
 always_ff @(posedge clk) begin
     if (ce12) vbl_line_d <= vbl_line;
@@ -410,15 +350,12 @@ always_ff @(posedge clk) begin
         cpu_int_n <= 1'b0;
 end
 
-//------------------------------------------------------- Big sprite registers ------------------------------------------------//
+reg       bs_prio = 1'b0;
+reg [5:0] attr_big_sprite = 6'd0;
+reg [7:0] y_big_sprite = 8'd0;
+reg [7:0] x_big_sprite = 8'd0;
 
-reg       bs_prio = 1'b0;               // ctrl 0 bit 0: big sprite under sprites
-reg [5:0] attr_big_sprite = 6'd0;       // ctrl 1
-reg [7:0] y_big_sprite = 8'd0;          // ctrl 2
-reg [7:0] x_big_sprite = 8'd0;          // ctrl 3
-
-// CC 98DC-98DF, Swimmer 98FC-98FF
-wire bs_ctrl_cs = cpu_addr[15:2] == (swimmer ? 14'h263F : toprollr ? 14'h2677 : 14'h2637);   // 98FC / 99DC / 98DC
+wire bs_ctrl_cs = cpu_addr[15:2] == (swimmer ? 14'h263F : toprollr ? 14'h2677 : 14'h2637);
 
 always_ff @(posedge clk) begin
     if (ce12 && mem_wr && bs_ctrl_cs) begin
@@ -431,11 +368,9 @@ always_ff @(posedge clk) begin
     end
 end
 
-// Swimmer background colour register ($B800)
 reg [7:0] bgcolor = 8'd0;
 always_ff @(posedge clk) if (ce12 && b800_we && swimmer && !au) bgcolor <= cpu_do;
 
-// Au palette RAM: B800-B87F (mirror 0780), 64 x xBGR_333 big-endian words; even byte = B, odd byte = G/R
 reg [7:0] aupal_b  [64];
 reg [7:0] aupal_gr [64];
 always_ff @(posedge clk) begin
@@ -445,13 +380,9 @@ always_ff @(posedge clk) begin
     end
 end
 
-//------------------------------------------------------- Colour RAM (scroll, sprites, attributes) ----------------------------//
-
-// 9800-9FFF with A5 not connected: scroll at 000-01F, sprites at 040-05F, attributes at 200-3FF.
-// Le Bagnard: 9800-9BFF one attribute per character, sprites = its first 32 bytes, no column scroll.
 wire [9:0] cpu_addr_mod = bagmanf ? cpu_addr[9:0] : {cpu_addr[10:6], cpu_addr[4:0]};
 wire [4:0] spr_base     = bagmanf ? 5'b00000 : 5'b00010;
-reg  [7:0] attr_cc = 8'd0;          // Le Bagnard: attribute of the character actually drawn (Y flip pairs)
+reg  [7:0] attr_cc = 8'd0;
 
 wire [7:0] y_line_shift;
 
@@ -465,7 +396,7 @@ always_ff @(posedge clk) begin
         case (x_pixel)
             3'b000: begin
                 color_ram_addr <= is_sprite ? {spr_base, sprite, 2'b10} : {5'b00000, x_tile_v};
-                if (ena_pixel) y_sp_bg <= ((toprollr | bagmanf) & ~is_sprite) ? 8'd0 : color_ram_do;   // no column scroll
+                if (ena_pixel) y_sp_bg <= ((toprollr | bagmanf) & ~is_sprite) ? 8'd0 : color_ram_do;
             end
             3'b010: begin
                 color_ram_addr <= is_sprite ? {spr_base, sprite, 2'b01} :
@@ -473,7 +404,6 @@ always_ff @(posedge clk) begin
                 if (ena_pixel) attr_sp_bg <= color_ram_do;
             end
             3'b100: begin
-                // Le Bagnard: Y flip draws the pair's other character with ITS attribute (tile index ^ 0x20)
                 color_ram_addr <= is_sprite ? {spr_base, sprite, 2'b00} :
                                   {y_line_shift[7:4], y_line_shift[3] ^ attr_sp_bg[7], x_tile_v};
                 if (ena_pixel) begin
@@ -487,22 +417,20 @@ always_ff @(posedge clk) begin
             end
             default: begin
                 color_ram_addr <= cpu_addr_mod;
-                color_ram_we   <= mem_wr & color_cs & ~(bagmanf & cpu_addr[10]);   // Le Bagnard: 9C00-9FFF unused
+                color_ram_we   <= mem_wr & color_cs & ~(bagmanf & cpu_addr[10]);
             end
         endcase
     end
 end
 
 ram_pool_pkg::pram_i_t colr_i;
-assign colr_i.a_addr = 15'(color_ram_addr);
+assign colr_i.a_addr = 16'(color_ram_addr);
 assign colr_i.a_d    = cpu_do;
 assign colr_i.a_we   = color_ram_we;
-assign colr_i.b_addr = 15'(15'd0);
+assign colr_i.b_addr = 16'(15'd0);
 assign colr_i.b_d    = 8'd0;
 assign colr_i.b_we   = 1'b0;
 assign color_ram_do = sp_o[0].a_q;
-
-//------------------------------------------------------- Tile RAM ------------------------------------------------------------//
 
 reg [9:0] tile_ram_addr = 10'd0;
 reg       tile_ram_we = 1'b0;
@@ -510,27 +438,24 @@ reg       tile_ram_we = 1'b0;
 always_ff @(posedge clk) begin
     if (ce12) begin
         tile_ram_we <= 1'b0;
-        // Y flip (attr bit 7) swaps the two characters of a row pair, as the pair shares one attribute (tile index ^ 0x20)
         if (x_pixel == 3'b100)
             tile_ram_addr <= {y_line_shift[7:4], y_line_shift[3] ^ (attr_sp_bg[7] & ~toprollr), x_tile_v};
         else begin
             tile_ram_addr <= cpu_addr[9:0];
-            tile_ram_we   <= mem_wr & tile_cs & ~(toprollr & cpu_addr[10]);   // Top Roller: 9400-97FF is bg colour RAM
+            tile_ram_we   <= mem_wr & tile_cs & ~(toprollr & cpu_addr[10]);
         end
     end
 end
 
 ram_pool_pkg::pram_i_t tram_i;
-assign tram_i.a_addr = 15'(tile_ram_addr);
+assign tram_i.a_addr = 16'(tile_ram_addr);
 assign tram_i.a_d    = cpu_do;
 assign tram_i.a_we   = tile_ram_we;
-assign tram_i.b_addr = 15'(hs_address[9:0]);
+assign tram_i.b_addr = 16'(hs_address[9:0]);
 assign tram_i.b_d    = hs_data_in;
 assign tram_i.b_we   = hs_write & hs_tile;
 assign tile_ram_do = pr_o[2].a_q;
 assign hs_tile_do = pr_o[2].b_q;
-
-//------------------------------------------------------- Tile / sprite graphics ----------------------------------------------//
 
 assign y_line_shift = y_line + y_sp_bg + 8'd1;
 
@@ -556,8 +481,6 @@ always_comb begin
     endcase
 end
 
-// Code bank bits: CC {attr4, attr5}; Swimmer attr4 only (4K planes, 512 chars / 128 sprites); Au {attr5, attr4};
-// Cannon Ball: chars in the first 4K of each plane (attr5 = code bit 8), 64 sprites in the second 4K
 wire [7:0] attr_cd = (bagmanf & ~is_sprite) ? attr_cc : attr_sp_bg;
 wire [1:0] code_hi = au      ? {attr_sp_bg[5], attr_sp_bg[4]} :
                      swimmer ? {1'b0, attr_sp_bg[4]} :
@@ -597,7 +520,6 @@ always_ff @(posedge clk) begin
     end
 end
 
-// Plane order follows the "tile" ROM region: first plane = pixel MSB
 assign tile_a = tile_graph_rom_addr;
 assign tile_rom0_do = tile0_q;
 
@@ -605,7 +527,6 @@ assign tile_rom1_do = tile1_q;
 
 assign tile_rom2_do = tile2_q;
 
-// Pixel = {colour, plane bits}: CC {0, 0, colour4, 2 bits}, Swimmer {bank, colour4, 3 bits}
 wire [2:0] x_sel = (hinv & ~is_sprite_r) ? x_pixel : ~x_pixel;
 wire [7:0] pixel_color = swimmer ? {tile_color_r, tile_graph1_r[x_sel], tile_graph2_r[x_sel], tile_graph3_r[x_sel]}
                                  : {2'b00, tile_color_r[3:0], tile_graph1_r[x_sel], tile_graph2_r[x_sel]};
@@ -614,14 +535,8 @@ function automatic pix_on(input sw, input [7:0] p);
     pix_on = sw ? (p[2:0] != 3'd0) : (p[1:0] != 2'd0);
 endfunction
 
-//------------------------------------------------------- Sprite line buffer --------------------------------------------------//
-
 reg  [8:0] addr_ram_sprite = 9'd0;
 
-// Swimmer draws sprites one pixel left of CC (x vs x+1, flipped 240-x vs 242-x)
-// CRT flip toggles HINV, but the PCB's flipped sprite X (242-x) is 2 px off a true mirror of the unflipped one;
-// move the sprite 2 px right on screen so the OSD flip is an exact 180 (sim-measured on both HINV paths: the buffer is
-// written down-counting when flipped but always read up-counting, so +2 is right in both)
 wire [8:0] sprite_crt_adj = crt_flip ? 9'd2 : 9'd0;
 wire [8:0] sprite_x_load = {1'b0, x_sprite ^ {8{hinv}}} - {8'd0, swimmer | yamato} + sprite_crt_adj;
 
@@ -636,17 +551,16 @@ always_ff @(posedge clk) begin
     end
 end
 
-// Read-and-clear during display, first-sprite-wins write during the sprite fetch
 wire [7:0] sprite_pixel_color;
 wire       sprite_hit   = pix_on(swimmer, sprite_pixel_color);
 wire [7:0] sprite_wdata = is_sprite_r ? (sprite_hit ? sprite_pixel_color : pixel_color) : 8'd0;
 wire       sprite_we    = ce_px & (is_sprite_r ? (keep_sprite & ~addr_ram_sprite[8]) : 1'b1);
 
 ram_pool_pkg::pram_i_t sline_i;
-assign sline_i.a_addr = 15'(addr_ram_sprite[7:0]);
+assign sline_i.a_addr = 16'(addr_ram_sprite[7:0]);
 assign sline_i.a_d    = sprite_wdata;
 assign sline_i.a_we   = sprite_we;
-assign sline_i.b_addr = 15'(15'd0);
+assign sline_i.b_addr = 16'(15'd0);
 assign sline_i.b_d    = 8'd0;
 assign sline_i.b_we   = 1'b0;
 assign sprite_pixel_color = sp_o[1].a_q;
@@ -663,8 +577,6 @@ always_ff @(posedge clk) begin
     end
 end
 
-//------------------------------------------------------- Big sprite ----------------------------------------------------------//
-
 wire [7:0] y_line_bs = y_line + y_big_sprite + 8'd1;
 
 reg  [7:0] x_bs_cnt = 8'd0;
@@ -674,16 +586,10 @@ reg  [7:0] bs_tile_code = 8'd0, bs_tile_code_r = 8'd0;
 reg  [7:0] bs_graph1 = 8'd0, bs_graph2 = 8'd0, bs_graph3 = 8'd0;
 reg  [7:0] bs_graph1_d = 8'd0, bs_graph2_d = 8'd0, bs_graph3_d = 8'd0;
 
-// Visibility (only the lower-right quadrant of the 32x32 map) travels with the tile through the
-// same pipeline stages as its pixels, so the window edge lands exactly on the map tile boundary
 reg        bs_vis_addr = 1'b0, bs_vis_code = 1'b0, bs_vis_r = 1'b0, bs_vis_g = 1'b0;
 reg  [7:0] bs_vis_d = 8'd0;
 wire [7:0] bs_rom0_do, bs_rom1_do, bs_rom2_do;
 
-// Top Roller: ctrl bits 4/5 are code bit 9 / priority, and the big sprite follows the screen flip
-// CRT flip: the big sprite X path does not see HINV (the hardware ignores the X flip; games flip it
-// in software), so the OSD flip mirrors it here instead: content via bs_fx, position via x_bs_pos = BS_CRT_FLIP_X - x.
-// Y already follows VINV through y_line.
 localparam [7:0] BS_CRT_FLIP_X = 8'd144;
 wire [7:0] x_bs_pos = crt_flip ? BS_CRT_FLIP_X - x_big_sprite : x_big_sprite;
 wire bs_fx = toprollr ? hinv : attr_big_sprite[4] ^ crt_flip;
@@ -699,7 +605,6 @@ always_comb begin
     endcase
 end
 
-// Ctrl bit 3 is tile code bit 8 on the 4K planes (Swimmer board, Tangram Q, Yamato); Top Roller adds bit 4 = code bit 9
 wire [1:0]  bs_bank     = toprollr ? attr_big_sprite[4:3] : {1'b0, (swimmer | tangramq | yamato) & attr_big_sprite[3]};
 wire [12:0] bs_rom_addr = {bs_bank, bs_tile_code_r, bs_fy ? ~y_line_bs[2:0] : y_line_bs[2:0]};
 
@@ -721,10 +626,10 @@ always_ff @(posedge clk) begin
 end
 
 ram_pool_pkg::pram_i_t bsr_i;
-assign bsr_i.a_addr = 15'(bs_ram_addr);
+assign bsr_i.a_addr = 16'(bs_ram_addr);
 assign bsr_i.a_d    = cpu_do;
 assign bsr_i.a_we   = bs_ram_we;
-assign bsr_i.b_addr = 15'(15'd0);
+assign bsr_i.b_addr = 16'(15'd0);
 assign bsr_i.b_d    = 8'd0;
 assign bsr_i.b_we   = 1'b0;
 assign bs_ram_do = sp_o[2].a_q;
@@ -763,8 +668,6 @@ always_ff @(posedge clk) begin
     end
 end
 
-// Big sprite pen: CC {colour3, 2 bits} and Swimmer {colour2, 3 bits} index a 32-entry PROM;
-// Au {colour3, 3 bits} indexes the palette RAM
 wire [2:0] bs_sel = ~x_bs_pos[2:0];
 wire [5:0] bs_pixel_color = swimmer ? {attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel], bs_graph3_d[bs_sel]}
                                     : {1'b0, attr_big_sprite[2:0], bs_graph1_d[bs_sel], bs_graph2_d[bs_sel]};
@@ -777,16 +680,14 @@ always_ff @(posedge clk) begin
     if (ce12) begin
         bs_pixel_color_r <= bs_pixel_color;
         bs_pixel_vis_r   <= bs_vis_d[bs_sel];
-        is_big_sprite_on <= pix_on(swimmer, {2'b00, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r && !bagmanf;   // Le Bagnard: no big sprite ROM
+        is_big_sprite_on <= pix_on(swimmer, {2'b00, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r && !bagmanf;
     end
 end
 
-//------------------------------------------------------- Palette PROMs -------------------------------------------------------//
-
-reg [7:0] pal    [64];      // CC: two 32x8 PROMs
-reg [3:0] pal_lo [256];     // Swimmer: 256x4 PROM, R2..R0 + G0
-reg [3:0] pal_hi [256];     // Swimmer: 256x4 PROM, B2..B1 + G2..G1
-reg [7:0] bspal  [32];      // big sprite PROM, both boards
+reg [7:0] pal    [64];
+reg [3:0] pal_lo [256];
+reg [3:0] pal_hi [256];
+reg [7:0] bspal  [32];
 
 always_ff @(posedge clk) begin
     if (dl_pal)    pal[ioctl_addr[5:0]]    <= ioctl_dout;
@@ -795,15 +696,13 @@ always_ff @(posedge clk) begin
     if (dl_bspal)  bspal[ioctl_addr[4:0]]  <= ioctl_dout;
 end
 
-// Yamato: third/fourth PROMs carry the blue nibble of the 12-bit character pens
-// Top Roller: five 32x8 PROMs = 0xA0 pens (fg/sprites 00, big sprite 40, bg 60), CC-style resistor DAC (board photo)
 reg [7:0] pal_tr [160];
 always_ff @(posedge clk) if (dl_tr_pal && ioctl_addr[7:0] < 8'hA0) pal_tr[ioctl_addr[7:0]] <= ioctl_dout;
 
 wire [5:0] tr_spr_pen, tr_bg_pen;
 wire       tr_spr_on, tr_clip;
 
-ram_pool_pkg::pram_i_t [3:0] trv_pr_i;   // Top Roller video RAMs = pool blocks pr 3-6
+ram_pool_pkg::pram_i_t [3:0] trv_pr_i;
 toprollr_video #(.X_START(8'd0), .Y_OFS(8'd1)) tr_video
 (
     .clk(clk),
@@ -829,8 +728,6 @@ toprollr_video #(.X_START(8'd0), .Y_OFS(8'd1)) tr_video
     .in_clip(tr_clip)
 );
 
-// Top Roller layers: bg, then big sprite / sprites (ctrl1 bit 5 puts the big sprite on top), all clipped;
-// the playfield goes over everything, unclipped
 wire tr_bs_on = pix_on(1'b0, {2'b00, bs_pixel_color_r}) && y_line_bs[7] && bs_pixel_vis_r;
 reg  [7:0] tr_pen;
 always_comb begin
@@ -860,7 +757,6 @@ reg [7:0] do_palette = 8'd0, do_bs_palette = 8'd0;
 reg [3:0] do_pal_lo = 4'd0, do_pal_hi = 4'd0;
 reg [7:0] do_au_b = 8'd0, do_au_gr = 8'd0, do_aubs_b = 8'd0, do_aubs_gr = 8'd0;
 
-// Au: 64 pens; empty playfield pixels show pen 0
 wire [5:0] au_pen = pf_clear_r ? 6'd0 : pixel_color_r[5:0];
 
 always_ff @(posedge clk) begin
@@ -876,9 +772,6 @@ always_ff @(posedge clk) begin
     end
 end
 
-//------------------------------------------------------- Colour output -------------------------------------------------------//
-
-// CC resistor DAC: R/G 1K/470/220, B 470/220
 function automatic [7:0] cc_dac3(input [2:0] v);
     case (v)
         3'd0: cc_dac3 = 8'd0;   3'd1: cc_dac3 = 8'd33;  3'd2: cc_dac3 = 8'd71;  3'd3: cc_dac3 = 8'd104;
@@ -892,7 +785,6 @@ function automatic [7:0] cc_dac2(input [1:0] v);
     endcase
 endfunction
 
-// Swimmer levels are binary weighted 0x20/0x40/0x80
 function automatic [23:0] cc_rgb(input [7:0] p);
     cc_rgb = {cc_dac3(p[2:0]), cc_dac3(p[5:3]), cc_dac2(p[7:6])};
 endfunction
@@ -901,7 +793,6 @@ function automatic [23:0] sw_rgb(input [7:0] p);
     sw_rgb = {p[2:0], 5'd0, p[5:3], 5'd0, p[7:6], 6'd0};
 endfunction
 
-// Au xBGR_333: 3-bit to 8-bit expansion
 function automatic [7:0] pal3(input [2:0] v);
     pal3 = {v, v, v[2:1]};
 endfunction
@@ -917,7 +808,6 @@ always_ff @(posedge clk) begin
     if (ce_px) screen_x <= video_hblank ? 9'd0 : screen_x + 9'd1;
 end
 
-// Yamato character pens: 4-bit weights 0E/1F/43/8F; big sprite 3-bit 21/47/97
 function automatic [7:0] ym4(input [3:0] v);
     ym4 = (v[0] ? 8'h0E : 8'h00) + (v[1] ? 8'h1F : 8'h00) + (v[2] ? 8'h43 : 8'h00) + (v[3] ? 8'h8F : 8'h00);
 endfunction
@@ -926,11 +816,9 @@ function automatic [7:0] ym3(input [2:0] v);
     ym3 = (v[0] ? 8'h21 : 8'h00) + (v[1] ? 8'h47 : 8'h00) + (v[2] ? 8'h97 : 8'h00);
 endfunction
 
-// Yamato gradient: 2 x 4K ROMs, bank {Q3,Q5,Q6}, bit 7 = flip, one entry per 2-pixel column
 wire [7:0]  grad0_do, grad1_do;
 wire [7:0]  grad_x    = screen_x[7:0] + 8'd8;
 wire [6:0]  grad_i    = grad_x[7:1];
-// gradient[bank << 8 | flip << 7 | i] with a 3-bit bank, so only the low 2K of each 4K ROM is addressed
 wire [11:0] grad_addr = {1'b0, mainlatch[3], mainlatch[5], mainlatch[6], hinv, grad_i};
 
 assign grad_a   = grad_addr;
@@ -951,7 +839,6 @@ wire [23:0] bs_rgb = yamato  ? {ym3(do_bs_palette[2:0]), ym3(do_bs_palette[5:3])
                      au      ? au_rgb(do_aubs_b, do_aubs_gr) :
                      swimmer ? sw_rgb(do_bs_palette) : cc_rgb(do_bs_palette);
 
-// Swimmer empty pixels: background register, or the fixed side panel colour right of column 24
 wire [23:0] bg_rgb   = {bgcolor[7:6], 6'd0, bgcolor[5:3], 5'd0, bgcolor[2:0], 5'd0};
 wire [23:0] side_rgb = 24'h209879;
 
@@ -979,12 +866,9 @@ end
 
 assign {video_r, video_g, video_b} = video_i;
 
-//------------------------------------------------------- Sound ---------------------------------------------------------------//
-
 wire io_wr = ~cpu_iorq_n & ~cpu_wr_n & cpu_m1_n;
 wire io_rd = ~cpu_iorq_n & ~cpu_rd_n & cpu_m1_n;
 
-// CC I/O 08 = AY address, 09 = AY data, 0C = AY read
 wire ay_bdir = ~swimmer & io_wr & (cpu_addr[7:1] == 7'b0000_100);
 wire ay_bc1  = ~swimmer & ((io_wr & (cpu_addr[7:0] == 8'h08)) | (io_rd & (cpu_addr[7:0] == 8'h0C)));
 
@@ -1003,7 +887,7 @@ cclimber_snd snd
     .rate_we(ce12 & a800_we & ~swimmer & ~bagmanf),
     .vol_we(ce12 & b000_we & ~swimmer),
     .cpu_do(cpu_do),
-    .trigger(mainlatch[4] & ~swimmer & ~bagmanf),   // Le Bagnard: sample ROMs unpopulated
+    .trigger(mainlatch[4] & ~swimmer & ~bagmanf),
     .vol5_en(vol5_en),
     .toprollr(toprollr),
 
@@ -1016,10 +900,8 @@ cclimber_snd snd
     .audio(cc_audio)
 );
 
-// sound board RAM = pool block sp 3, driven by the active sound board
 ram_pool_pkg::pram_i_t sw_sp_i, tq_sp_i, ym_sp_i;
 
-// Sound latch is clocked on the rising edge of /WRS at the end of the main CPU write
 reg a800_we_d = 1'b0;
 always_ff @(posedge clk) a800_we_d <= a800_we;
 
@@ -1047,7 +929,6 @@ swimmer_snd snd_sw
     .audio(sw_audio)
 );
 
-// Tangram Q: B000 write = sound latch, clocked at the end of the write like /WRS
 wire signed [15:0] tq_audio;
 reg b000_we_d = 1'b0;
 always_ff @(posedge clk) b000_we_d <= b000_we;
@@ -1074,11 +955,10 @@ tangramq_snd snd_tq
     .audio(tq_audio)
 );
 
-// Yamato: OUT $00 / $01 load the two polled sound latches
 wire signed [15:0] ym_audio;
 reg io_wr_d = 1'b0;
 always_ff @(posedge clk) io_wr_d <= io_wr;
-wire ym_out = yamato & io_wr & ~io_wr_d;          // start of the OUT: port address and data both valid
+wire ym_out = yamato & io_wr & ~io_wr_d;
 
 yamato_snd snd_ym
 (
@@ -1103,9 +983,6 @@ yamato_snd snd_ym
     .audio(ym_audio)
 );
 
-//------------------------------------------------------- Le Bagnard speech daughterboard ------------------------------------//
-
-// A800-A807 LS259: Q0-Q2 speech ROM bit select, Q3 start, Q4/Q5 ROM chip selects
 reg [7:0] tmslatch = 8'd0;
 always_ff @(posedge clk) begin
     if (reset)
@@ -1114,7 +991,6 @@ always_ff @(posedge clk) begin
         tmslatch[cpu_addr[2:0]] <= cpu_do[0];
 end
 
-// PROM clock 320 kHz (49.152 MHz * 5 / 768), TMS5110 sample every 40 PROM clocks (640 kHz / 80)
 reg  [9:0] tms_acc = 10'd0;
 reg  [5:0] tms_div = 6'd0;
 reg        tms_ce = 1'b0, tms_smp = 1'b0;
@@ -1130,35 +1006,24 @@ always_ff @(posedge clk) begin
         tms_acc <= tms_acc + 10'd5;
 end
 
-wire [12:0] spch_addr;
-// spch_q is now the ROM block port
-// wire  [7:0] spch_q;
 wire  [3:0] tms_ctl;
 wire        tms_pdc, tms_m0, tms_bit, tms_busy;
 wire signed [15:0] tms_out;
 
-assign spch_a = spch_addr;
-
-tmsprom tms_vsm
-(
-    .clk(clk),
-    .reset(reset | ~bagmanf),
-    .ce_romclk(tms_ce),
-    .chip_busy(tms_busy),
-    .enable(tmslatch[3]),
-    .bit_sel(3'd7 - {tmslatch[0], tmslatch[1], tmslatch[2]}),
-    .csq0(tmslatch[4]),
-    .csq1(tmslatch[5]),
-    .prom_wr(dl_sprom),
-    .prom_waddr(ioctl_addr[4:0]),
-    .prom_wdata(ioctl_dout),
-    .rom_addr(spch_addr),
-    .rom_q(spch_q),
-    .m0(tms_m0),
-    .data_bit(tms_bit),
-    .ctl(tms_ctl),
-    .pdc(tms_pdc)
-);
+assign tmsprom_0_i.reset      = reset | ~bagmanf;
+assign tmsprom_0_i.ce_romclk  = tms_ce;
+assign tmsprom_0_i.chip_busy  = tms_busy;
+assign tmsprom_0_i.enable     = tmslatch[3];
+assign tmsprom_0_i.bit_sel    = 3'd7 - {tmslatch[0], tmslatch[1], tmslatch[2]};
+assign tmsprom_0_i.csq0       = tmslatch[4];
+assign tmsprom_0_i.csq1       = tmslatch[5];
+assign tmsprom_0_i.prom_wr    = dl_sprom;
+assign tmsprom_0_i.prom_waddr = ioctl_addr[4:0];
+assign tmsprom_0_i.prom_wdata = ioctl_dout;
+assign tmsprom_0_i.m0         = tms_m0;
+assign tms_bit = tmsprom_0_o.data_bit;
+assign tms_ctl = tmsprom_0_o.ctl;
+assign tms_pdc = tmsprom_0_o.pdc;
 
 assign tms_i.reset     = reset | ~bagmanf;
 assign tms_i.ce_sample = tms_smp;
@@ -1169,13 +1034,11 @@ assign tms_m0   = tms_o.m0;
 assign tms_busy = tms_o.busy;
 assign tms_out  = tms_o.sample;
 
-// Speech added 1:1 to the CK mix (AY 0.40, TMS5110 1.0), saturated
 wire signed [16:0] bg_sum   = cc_audio + tms_out;
 wire signed [15:0] bg_audio = (bg_sum > 17'sd32767) ? 16'sd32767 : (bg_sum < -17'sd32768) ? -16'sd32768 : bg_sum[15:0];
 
 assign audio = swimmer ? sw_audio : tangramq ? tq_audio : yamato ? ym_audio : bagmanf ? bg_audio : cc_audio;
 
-// pool block buses (driven here, after every alias is declared)
 assign pr_i = {trv_pr_i, tram_i, ram8_i, ram6_i};
 assign sp_i = {swimmer ? sw_sp_i : tangramq ? tq_sp_i : ym_sp_i, bsr_i, sline_i, colr_i};
 

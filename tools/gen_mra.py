@@ -14,6 +14,8 @@ Usage:
 import re
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RodimusCoresMaster_MiSTer" / "tools"))
+import mra_tidy                                     # noqa: E402  fleet MRA comment format
 
 MAME_VERSION = "0289"
 HISCORE_DAT = Path("/CybertronMD/Mame/plugins/hiscore/hiscore.dat")   # current file (user, 2026-09-27)
@@ -120,14 +122,14 @@ F_DECRYPT, F_VOL5, F_VERT, F_NMIQ3, F_SWIMMER, F_ROT90 = 0x01, 0x08, 0x10, 0x20,
 XOR = {"init_rpatrol": 1 << 1, "init_ckongb": 2 << 1, "init_dking": 3 << 1}
 
 BUTTONS = {
-    LAYOUT_TOPROLLR: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
-    LAYOUT_YAMATO: ("Button 1,Button 2,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 2, "8-way", ""),
-    LAYOUT_TANGRAMQ: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "2-way horizontal", ""),
-    LAYOUT_CANNONB: ("Fire,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
-    LAYOUT_SWIMMER: ("Button 1,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "8-way", ""),
+    LAYOUT_TOPROLLR: ("Button 1,-,-,-,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
+    LAYOUT_YAMATO: ("Button 1,Button 2,-,-,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 2, "8-way", ""),
+    LAYOUT_TANGRAMQ: ("Button 1,-,-,-,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "2-way horizontal", ""),
+    LAYOUT_CANNONB: ("Fire,-,-,-,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
+    LAYOUT_SWIMMER: ("Button 1,-,-,-,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "8-way", ""),
     LAYOUT_CC:      ("R Right,R Left,R Down,R Up,Coin,Start 1P,Start 2P,Pause", "A,Y,B,X,Select,Start,R,L", 4, "8-way", "twin stick"),
-    LAYOUT_CKONG:   ("Jump,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
-    LAYOUT_RPATROL: ("Gas,Not Used,Not Used,Not Used,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "2-way horizontal", ""),
+    LAYOUT_CKONG:   ("Jump,-,-,-,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "4-way", ""),
+    LAYOUT_RPATROL: ("Gas,-,-,-,Coin,Start 1P,Start 2P,Pause", "A,B,X,Y,Select,Start,R,L", 1, "2-way horizontal", ""),
 }
 
 CC_COMMON = [
@@ -453,7 +455,7 @@ def mra(g, games, segs):
     <joystick>{joy}</joystick>
     <special_controls>{special}</special_controls>
     <num_buttons>{nbtn}</num_buttons>
-    <buttons names="{names}" default="{default}"/>
+    <buttons names="{names}" default="{mra_tidy.button_defaults(names, default)}"/>
 
     <switches default="{sw_default}">
 {dip_lines}
@@ -524,7 +526,7 @@ def main():
                      g["machine"] == "yamato", g["machine"] == "toprollr")
         path = out_path(out_dir, g, games)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(mra(g, games, segs))
+        path.write_text(mra_tidy.tidy(mra(g, games, segs)))
         print(f'{name:12s} {LAYOUT_BY_INPUT[g["inputs"]]:02X} {flags_for(g, segs)[1]:02X}  {path.relative_to(out_dir)}')
 
 

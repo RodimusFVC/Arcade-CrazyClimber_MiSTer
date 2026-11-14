@@ -11,19 +11,19 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/swimmer/swimmer_snd.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/tangramq/tangramq_snd.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/boards/yamato/yamato_snd.sv
 
-set_global_assignment -name QIP_FILE rtl/cpu/T80/T80.qip
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/rodimus/t80sv/t80sv_all.sv
 
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/tms5110.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/tmsprom.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/segacrypt/sega_315_5018.sv
-set_global_assignment -name QIP_FILE rtl/sound/v_sound.qip
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/rodimus/tms5110/tms5110.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/rodimus/tms5110/tmsprom.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/rodimus/sega_315_5018/sega_315_5018.sv
+set_global_assignment -name QIP_FILE rtl/sound/jt49/hdl/jt49.qip
+set_global_assignment -name VERILOG_FILE rtl/sound/jt49/hdl/filter/jt49_dcrm2.v
 
 set_global_assignment -name VERILOG_FILE rtl/mister_custom/pause.v
 set_global_assignment -name VERILOG_FILE rtl/mister_custom/hiscore.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister_custom/controllers.sv
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ram_rom/dpram_dc.sv
-set_global_assignment -name VHDL_FILE rtl/ram_rom/spram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ram_rom/rom_loader.sv
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/art/artwork.sv

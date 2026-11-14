@@ -1,16 +1,9 @@
-//============================================================================
-//
-//  Crazy Climber sound: AY-3-8910 + TTL 4-bit sample player (CCG-2)
+//  Based on MAME cclimber_a.cpp (Nicola Salmoria, hap, BSD-3-Clause)
 //  Copyright (C) 2026 Rodimus
-//
-//  Sample sequencing per MAME cclimber_a.cpp (Nicola Salmoria, hap);
-//  DAC and volume weights from the CCG-2 schematic
-//
-//============================================================================
 
 module cclimber_snd
 (
-    input               clk,            // 49.152 MHz
+    input               clk,
     input               reset,
 
     input               ay_bdir,
@@ -18,25 +11,22 @@ module cclimber_snd
     input         [7:0] ay_din,
     output        [7:0] ay_dout,
 
-    input               rate_we,        // $A800
-    input               vol_we,         // $B000
+    input               rate_we,
+    input               vol_we,
     input         [7:0] cpu_do,
-    input               trigger,        // LS259 Q4
-    input               vol5_en,        // volume D4 (47K) fitted
-    input               toprollr,       // Top Roller: AY 1.5 MHz, sample base AY / 4, ROM on index 7
+    input               trigger,
+    input               vol5_en,
+    input               toprollr,
 
-    output       [12:0] smp_a,          // sample ROM block in the dispatcher rtl/cclimber_dispatcher.sv
+    output       [12:0] smp_a,
     input         [7:0] smp_q,
 
-    output chip_pool_pkg::aysel_i_t [0:0] aysel_i,      // shared AY (rtl/cclimber_dispatcher.sv)
+    output chip_pool_pkg::aysel_i_t [0:0] aysel_i,
     input  chip_pool_pkg::aysel_o_t [0:0] aysel_o,
 
     output signed [15:0] audio
 );
 
-//------------------------------------------------------- Clock enables -------------------------------------------------------//
-
-// AY = 18.432/3/2/2 = 1.536 MHz, sample base = 768 kHz, DC filter = 48 kHz
 reg [9:0] div = 10'd0;
 always_ff @(posedge clk) div <= div + 10'd1;
 
@@ -44,7 +34,6 @@ wire cen_ay_cc  = div[4:0] == 5'd0;
 wire cen_smp_cc = div[5:0] == 6'd0;
 wire cen_dc     = div == 10'd0;
 
-// Top Roller (AY 12 MHz / 8, sample clock divider 4): 1.5 MHz = 125/4096 of 49.152 MHz, sample base = every 4th
 reg [11:0] tr_frac = 12'd0;
 reg        tr_cen = 1'b0;
 reg  [1:0] tr_div = 2'd0;
@@ -62,12 +51,9 @@ end
 wire cen_ay  = toprollr ? tr_cen : cen_ay_cc;
 wire cen_smp = toprollr ? (tr_cen && tr_div == 2'd0) : cen_smp_cc;
 
-//------------------------------------------------------- AY-3-8910 -----------------------------------------------------------//
-
 wire [7:0] ay_a, ay_b, ay_c;
 wire [7:0] start_addr, loop_addr;
 
-// the shared AY (aysel 0); it no longer sees this board's reset, so a held board reads 0 as the reset chip did
 assign aysel_i[0].ce   = cen_ay;
 assign aysel_i[0].sel  = 1'b1;
 assign aysel_i[0].bdir = ay_bdir;
@@ -79,8 +65,6 @@ assign ay_b       = aysel_o[0].b;
 assign ay_c       = aysel_o[0].c;
 assign start_addr = aysel_o[0].ioa_out;
 assign loop_addr  = aysel_o[0].iob_out;
-
-//------------------------------------------------------- Sample player -------------------------------------------------------//
 
 reg  [7:0] rate = 8'd0;
 reg  [4:0] volume = 5'd0;
@@ -96,7 +80,6 @@ reg [13:0] smp_addr = 14'd0;
 assign smp_a    = smp_addr[13:1];
 assign smp_data = smp_q;
 
-// Rate counter reloads from $A800 on carry: period = 256 - rate ticks of 768 kHz
 reg [7:0] rate_cnt = 8'd0;
 reg [3:0] nibble = 4'd0;
 reg       trig_d = 1'b0;
@@ -121,9 +104,6 @@ always_ff @(posedge clk) begin
         smp_addr <= {start_addr, 6'd0};
 end
 
-//------------------------------------------------------- DAC -----------------------------------------------------------------//
-
-// 4066 switches into 100K/200K/390K/820K, referenced to the volume amp (47K/100K/200K/390K/820K)
 localparam [11:0] W47K = 12'd2128, W100K = 12'd1000, W200K = 12'd500, W390K = 12'd256, W820K = 12'd122;
 
 wire [11:0] nib_w = (nibble[3] ? W100K : 12'd0) + (nibble[2] ? W200K : 12'd0) +
@@ -136,9 +116,6 @@ wire [12:0] vol_w = ((volume[4] & vol5_en) ? {1'b0, W47K} : 13'd0) +
 reg [24:0] dac_prod = 25'd0;
 always_ff @(posedge clk) dac_prod <= nib_w * vol_w;
 
-//------------------------------------------------------- Mix -----------------------------------------------------------------//
-
-// AY and DAC at 0.5 each; AC coupling approximated by the DC remover
 wire [9:0]  ay_sum = {2'b00, ay_a} + {2'b00, ay_b} + {2'b00, ay_c};
 wire [15:0] mix    = {2'b00, ay_sum, 4'd0} + {1'b0, dac_prod[23:9]};
 

@@ -1,7 +1,7 @@
 //============================================================================
 //
 //  Crazy Climber ROM loader
-//  ROM layout matched to MAME cclimber.cpp regions
+// Based on MAME cclimber.cpp (Nicola Salmoria, BSD-3-Clause)
 //
 //============================================================================
 
@@ -54,7 +54,7 @@
 //
 // ioctl index 7 (Top Roller: banked 315-5018 CPU, 12 MHz board; best effort without schematics):
 //   0x00000 - 0x0BFFF  "user1" banks 0-2, 0000-3FFF of each (bank n = user1 n*0x6000)
-//   0x0C000 - 0x0DFFF  "user1" 0x4000-0x5FFF: the slice MAME ROM_COPYs into every bank (fixed 4000-5FFF)
+//   0x0C000 - 0x0DFFF  "user1" 0x4000-0x5FFF: the slice copied into every bank (fixed 4000-5FFF)
 //   0x10000 - 0x13FFF  main CPU C000-FFFF      "maincpu" 0xC000
 //   0x14000 - 0x15FFF  tile plane MSB          "tile" first half
 //   0x16000 - 0x17FFF  tile plane LSB          "tile" second half

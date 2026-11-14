@@ -42,12 +42,12 @@ wire        ioctl_upload_req;
 wire  [7:0] ioctl_din;
 wire        ioctl_wr;
 wire  [7:0] ioctl_index;
-wire [26:0] ioctl_addr27;                     // hps_io's full address: the artwork download can pass 32 MB
-wire [24:0] ioctl_addr = ioctl_addr27[24:0];  // every other ioctl user
+wire [26:0] ioctl_addr27;
+wire [24:0] ioctl_addr = ioctl_addr27[24:0];
 wire  [7:0] ioctl_dout;
 wire [15:0] joystick_0, joystick_1;
-wire [15:0] joystick_r_analog_0;   // right analog stick: [15:8]=Y signed, [7:0]=X signed
-wire [15:0] joystick_r_analog_1;   // P2 right analog stick (cocktail)
+wire [15:0] joystick_r_analog_0;
+wire [15:0] joystick_r_analog_1;
 wire [21:0] gamma_bus;
 wire        direct_video;
 wire        video_rotated;
@@ -70,7 +70,7 @@ assign HDMI_BOB_DEINT = 0;
 wire signed [15:0] audio;
 assign AUDIO_L = pause_cpu ? 16'd0 : audio;
 assign AUDIO_R = pause_cpu ? 16'd0 : audio;
-assign AUDIO_S = 1;   // signed
+assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
 assign LED_DISK  = 0;
@@ -78,16 +78,9 @@ assign LED_POWER = 0;
 assign LED_USER  = ioctl_download;
 assign BUTTONS = 0;
 
-///////////////////////////////////////////////////
-
-// MRA index 1: byte 0 = control layout, byte 1 = board flags
-//   layout: 0 Crazy Climber twin stick, 1 Crazy Kong, 2 River Patrol, 3 Swimmer / Guzzler, 4 Cannon Ball, 5 Tangram Q, 6 Yamato, 7 Top Roller
-// ROM images: index 0 CC board, 2 Swimmer board, 5 Tangram Q, 6 Yamato, 7 Top Roller; 3 and 4 are reserved for hiscore config / NVRAM
-//   flags : [0] decryption PROM, [2:1] ROM XOR mode, [3] volume D4 fitted, [4] vertical (ROT270),
-//           [5] latch Q3 drives the NMI mask, [6] Swimmer board (ROMs on index 2), [7] vertical is ROT90
 reg [7:0] game_layout = 8'd0;
 reg [7:0] game_flags  = 8'd1;
-reg [7:0] game_var    = 8'd0;   // byte 2 (optional): [0] Au, [1] Cannon Ball board, [2] Cannon Ball ROM XOR, [3] Tangram Q, [4] Yamato, [5] Top Roller, [6] Le Bagnard
+reg [7:0] game_var    = 8'd0;
 
 always @(posedge CLK_49M) begin
 	if (ioctl_wr && ioctl_index == 8'd1) begin
@@ -102,7 +95,7 @@ wire vert_view = game_vert & ~status[12];
 
 wire [1:0] ar = status[14:13];
 
-wire        art_fb;                // artwork framebuffer on HDMI: square canvas pixels
+wire        art_fb;
 wire        art_wait, art_avail;
 wire [11:0] art_cw, art_ch;
 assign VIDEO_ARX = (!ar) ? (art_fb ? art_cw : vert_view ? 12'd3 : 12'd4) : (ar - 1'd1);
@@ -140,7 +133,7 @@ localparam CONF_STR = {
 	"DIP;",
 	"-;",
 	"R0,Reset;",
-	"J1,Btn 1,Btn 2,Btn 3,Btn 4,Coin,Start 1P,Start 2P,Pause;",
+	"J1,Button 1,Button 2,Button 3,Button 4,Coin,Start 1P,Start 2P,Pause;",
 	"jn,A,B,X,Y,Select,Start,R,L;",
 	"V,v",`BUILD_DATE
 };
@@ -177,8 +170,6 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ps2_key(ps2_key)
 );
 
-////////////////////   CLOCKS   ///////////////////
-
 pll pll
 (
 	.refclk(CLK_50M),
@@ -207,20 +198,14 @@ pll_cfg pll_cfg
 	.reconfig_from_pll(reconfig_from_pll)
 );
 
-// 12.288 MHz enable: twice the 6.144 MHz pixel clock (18.432 MHz / 3)
 reg [1:0] ce_div = 2'd0;
 always @(posedge CLK_49M) ce_div <= ce_div + 2'd1;
 wire ce12 = (ce_div == 2'd0);
 
-// Hold the Z80 in reset until the PLL is locked and the ROM download has finished
 wire reset = RESET | status[0] | buttons[1] | ioctl_download | ~locked;
 
-///////////////////         Keyboard           //////////////////
-
-// keyboard -> controllers.sv ctl_keyboard (keys now act on press), W / S / A / D through its extra-key
-// table.
 /* verilator lint_off UNUSED */
-wire [12:0] kb;                     // 9 and T are not used on this board
+wire [12:0] kb;
 /* verilator lint_on UNUSED */
 wire  [3:0] kbx;
 ctl_keyboard #(.NX(4), .NXO(4), .XKEYS({24'h10_1D_03, 24'h10_1B_02, 24'h10_1C_01, 24'h10_23_00})) u_kb(.clk(CLK_49M),
@@ -230,9 +215,6 @@ wire kb_rup = kbx[3], kb_rdown = kbx[2], kb_rleft = kbx[1], kb_rright = kbx[0];
 wire kb_b1 = kb[4], kb_b2 = kb[5];
 wire kb_coin1 = kb[8], kb_coin2 = kb[9], kb_start1 = kb[6], kb_start2 = kb[7], kb_pause = kb[12];
 
-//////////////////  Arcade Buttons/Interfaces   ///////////////////////////
-
-// Joystick bits: 0 R, 1 L, 2 D, 3 U, 4-7 Btn 1-4, 8 Coin, 9 Start 1P, 10 Start 2P, 11 Pause
 wire m_up1    = joystick_0[3] | kb_up;
 wire m_down1  = joystick_0[2] | kb_down;
 wire m_left1  = joystick_0[1] | kb_left;
@@ -251,56 +233,47 @@ wire m_b2_2   = joystick_1[5];
 wire m_b3_2   = joystick_1[6];
 wire m_b4_2   = joystick_1[7];
 
-// Right analog stick drives the right hand
-wire [3:0] rdir0, rdir1;            // {U, D, L, R}
-// right-stick directions -> ctl_stick_dirs (+-48 per axis)
+wire [3:0] rdir0, rdir1;
 ctl_stick_dirs #(.MODE(0), .THRESH(7'd48)) u_rs0(.stick(joystick_r_analog_0), .dir(rdir0));
 ctl_stick_dirs #(.MODE(0), .THRESH(7'd48)) u_rs1(.stick(joystick_r_analog_1), .dir(rdir1));
-wire [3:0] rstick0 = {rdir0[2], rdir0[3], rdir0[1], rdir0[0]};  // {D,U,L,R}
+wire [3:0] rstick0 = {rdir0[2], rdir0[3], rdir0[1], rdir0[0]};
 wire [3:0] rstick1 = {rdir1[2], rdir1[3], rdir1[1], rdir1[0]};
 
 wire m_coin1  = joystick_0[8]  | kb_coin1;
 wire m_coin2  = joystick_1[8]  | kb_coin2;
-// pads never linked: pad 2's Start gives Start 2 only
 wire m_start1 = joystick_0[9]  | kb_start1;
 wire m_start2 = joystick_0[10] | joystick_1[10] | joystick_1[9] | kb_start2;
 wire m_pause  = joystick_0[11] | kb_pause;
 
-// DIP switches arrive from the OSD via ioctl index 254
 reg [7:0] dip_sw[8] = '{8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00};
 always @(posedge CLK_49M) begin
 	if (ioctl_wr && (ioctl_index == 8'd254) && !ioctl_addr[24:3])
 		dip_sw[ioctl_addr[2:0]] <= ioctl_dout;
 end
 
-// Swimmer-board coins are PORT_IMPULSE(2): a press is latched, then presented for exactly two whole
-// frames starting at the next vblank, however long or briefly it is held
-// -> controllers.sv ctl_coin_impulse, paused with the CPU (PAUSE_MODE 1: the frame count holds, a
-// press made while paused is discarded).
 wire coin1_imp, coin2_imp;
 ctl_coin_impulse #(.FRAMES(4'd2), .PAUSE_MODE(1)) u_coin1(.clk(CLK_49M), .pause(pause_cpu), .vblank(vblank), .en(1'b1),
 	.coin_raw(m_coin1), .coin(coin1_imp));
 ctl_coin_impulse #(.FRAMES(4'd2), .PAUSE_MODE(1)) u_coin2(.clk(CLK_49M), .pause(pause_cpu), .vblank(vblank), .en(1'b1),
 	.coin_raw(m_coin2), .coin(coin2_imp));
 
-// Per-game port layout and polarity
 reg [7:0] in_p1, in_p2, in_dsw, in_sys, in_sys1, in_sys2;
 always @(*) begin
 	in_dsw  = dip_sw[0];
 	in_sys1 = 8'hFF;
 	in_sys2 = 8'hFF;
 	case (game_layout)
-		8'd7: begin // Top Roller: P1 bits 0-2 are the Coin B switches; SYSTEM active low
+		8'd7: begin
 			in_p1  = {m_right1, m_left1, m_down1, m_up1, m_b1_1, dip_sw[1][2:0]};
 			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b1_2, 3'b000};
 			in_sys = {4'hF, ~m_start2, ~m_start1, ~m_coin1, ~m_coin2};
 		end
-		8'd6: begin // Yamato: 8-way + 2 buttons; the US set reads its Coin B switches (DSW2) through P1/P2 bits 0-1
+		8'd6: begin
 			in_p1  = {m_right1, m_left1, m_down1, m_up1, m_b2_1, m_b1_1, dip_sw[1][1:0]};
 			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b2_2, m_b1_2, dip_sw[1][3:2]};
 			in_sys = {4'b0000, m_start2, m_start1, m_coin1, m_coin2};
 		end
-		8'd5: begin // Tangram Q: 2-way + button; B000 = DSW2, B800 = DSW1; coins/starts on 8000/8020 (active low)
+		8'd5: begin
 			in_p1   = {4'b0000, m_left1, m_right1, m_b1_1, 1'b0};
 			in_p2   = {4'b0000, m_left2, m_right2, m_b1_2, 1'b0};
 			in_dsw  = dip_sw[1];
@@ -308,27 +281,27 @@ always @(*) begin
 			in_sys1 = {2'b11, ~m_coin1, 2'b11, ~m_start1, ~m_start2, 1'b1};
 			in_sys2 = {4'hF, ~m_coin2, 3'b111};
 		end
-		8'd1: begin // Crazy Kong: 4-way + jump, SYSTEM active low
+		8'd1: begin
 			in_p1  = {m_right1, m_left1, m_down1, m_up1, m_b1_1, 3'b000};
 			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b1_2, 3'b000};
 			in_sys = {4'hF, ~m_start2, ~m_start1, ~m_coin2, ~m_coin1};
 		end
-		8'd3: begin // Swimmer / Guzzler: A000 = P2, A800 = P1, coins and starts share DSW2
+		8'd3: begin
 			in_p1  = {3'b000, m_b1_2, m_down2, m_up2, m_left2, m_right2};
 			in_p2  = {3'b000, m_b1_1, m_down1, m_up1, m_left1, m_right1};
 			in_sys = {dip_sw[1][7:4], m_start2, m_start1, coin2_imp, coin1_imp};
 		end
-		8'd4: begin // Cannon Ball: Crazy Kong ports with P1 right/left swapped
+		8'd4: begin
 			in_p1  = {m_left1, m_right1, m_down1, m_up1, m_b1_1, 3'b000};
 			in_p2  = {m_right2, m_left2, m_down2, m_up2, m_b1_2, 3'b000};
 			in_sys = {4'hF, ~m_start2, ~m_start1, ~m_coin2, ~m_coin1};
 		end
-		8'd2: begin // River Patrol: P1 port carries the cocktail player
+		8'd2: begin
 			in_p1  = {m_right2, m_left2, 5'b00000, m_b1_2};
 			in_p2  = {m_right1, m_left1, 5'b00000, m_b1_1};
 			in_sys = {4'hF, m_start2, m_start1, 1'b1, ~m_coin1};
 		end
-		default: begin // Crazy Climber: left hand on the d-pad, right hand on Btn 1-4 or the right analog stick
+		default: begin
 			in_p1  = {m_b1_1 | rstick0[0], m_b2_1 | rstick0[1], m_b3_1 | rstick0[3], m_b4_1 | rstick0[2],
 			          m_right1, m_left1, m_down1, m_up1};
 			in_p2  = {m_b1_2 | rstick1[0], m_b2_2 | rstick1[1], m_b3_2 | rstick1[3], m_b4_2 | rstick1[2],
@@ -338,7 +311,6 @@ always @(*) begin
 	endcase
 end
 
-// PAUSE SYSTEM
 wire [23:0] rgb_out;
 pause #(8,8,8,49) pause
 (
@@ -349,8 +321,6 @@ pause #(8,8,8,49) pause
 	.options(~status[26:25])
 );
 
-///////////////                 Video                  ////////////////
-
 wire hblank, vblank;
 wire hs, vs;
 wire [7:0] r, g, b;
@@ -358,8 +328,6 @@ wire ce_pix;
 wire bd_hblank, bd_vblank, bd_hs, bd_vs;
 wire [7:0] bd_r, bd_g, bd_b;
 
-// MAME artwork (ioctl index 10: indexes 0-7 are ROM layouts / config; OSD Game Options page): native composite on the
-// core video (one pixel late), full view through the DDR3 framebuffer on HDMI
 wire        art_run, art_ddr;
 wire [31:0] art_fb_base;
 wire  [7:0] art_burstcnt, art_be;
@@ -383,10 +351,9 @@ artwork #(.IDX(8'd10)) artwork
 	.DDRAM_DOUT(DDRAM_DOUT), .DDRAM_DOUT_READY(DDRAM_DOUT_READY), .DDRAM_RD(art_rd),
 	.DDRAM_DIN(art_din), .DDRAM_BE(art_be), .DDRAM_WE(art_we)
 );
-// Orientation Horz (rotated monitor): the artwork turns its own view, so it keeps the framebuffer
 assign art_fb = art_run & ~direct_video;
 
-wire rotate_ccw = ~game_flags[7];  // ROT270 sets rotate CCW, ROT90 sets CW
+wire rotate_ccw = ~game_flags[7];
 wire no_rotate  = ~game_vert | status[12] | direct_video;
 wire flip       = status[11];
 wire        sr_fb_en, sr_clk, sr_rd, sr_we;
@@ -406,7 +373,6 @@ screen_rotate screen_rotate
 	.DDRAM_BE(sr_be), .DDRAM_WE(sr_we), .DDRAM_RD(sr_rd)
 );
 
-// the artwork takes the framebuffer while it draws, and DDR3 while it loads or draws
 assign FB_EN     = art_fb | sr_fb_en;
 assign FB_FORMAT = art_fb ? 5'b00110  : sr_fb_format;
 assign FB_WIDTH  = art_fb ? art_cw    : sr_fb_w;
@@ -435,8 +401,6 @@ arcade_video #(260,24) arcade_video
 
 	.fx(status[17:15])
 );
-
-///////////////                 Board                  ////////////////
 
 wire flip_x, flip_y;
 
@@ -499,7 +463,6 @@ cclimber_dispatcher board
 	.hs_write(hs_write_enable)
 );
 
-// Hiscore: config = MRA index 3, dump = index 4; RAM via the board's second port while the CPU is paused
 wire [15:0] hs_address;
 wire  [7:0] hs_data_in;
 wire  [7:0] hs_data_out;

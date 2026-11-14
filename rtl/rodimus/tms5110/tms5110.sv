@@ -1,16 +1,7 @@
-//============================================================================
-//
-//  TMS5110A LPC speech synthesizer
+//  SPDX-License-Identifier: BSD-3-Clause
 //  Copyright (C) 2026 Rodimus
-//
-//  Port of MAME devices/sound/tms5110.cpp (BSD-3-Clause; Frank Palazzolo,
+//  Port of MAME src/devices/sound/tms5110.cpp (license:BSD-3-Clause, copyright-holders: Frank Palazzolo,
 //  Jarek Burczynski, Aaron Giles, Jonathan Gevaryahu, Couriersud)
-//
-//  ce_sample   one output sample (chip clock / 80)
-//  m0          advances the VSM address; data_bit is sampled BIT_WAIT clocks later
-//  busy        high while a sample or command is in flight (VSM holds its clock)
-//
-//============================================================================
 
 module tms5110 #(parameter BIT_WAIT = 4)
 (
@@ -26,9 +17,7 @@ module tms5110 #(parameter BIT_WAIT = 4)
     output reg signed [15:0] sample
 );
 
-//------------------------------------------------------- TMS5110A tables (MAME tms5110r.hxx) ----------------------------------//
-
-function automatic [7:0] energy_tab(input [3:0] i);        // TI_028X_LATER_ENERGY
+function automatic [7:0] energy_tab(input [3:0] i);
     case (i)
         0: energy_tab = 0;   1: energy_tab = 1;   2: energy_tab = 2;   3: energy_tab = 3;
         4: energy_tab = 4;   5: energy_tab = 6;   6: energy_tab = 8;   7: energy_tab = 11;
@@ -37,7 +26,7 @@ function automatic [7:0] energy_tab(input [3:0] i);        // TI_028X_LATER_ENER
     endcase
 endfunction
 
-function automatic [7:0] pitch_tab(input [4:0] i);         // TI_5110_PITCH
+function automatic [7:0] pitch_tab(input [4:0] i);
     case (i)
         0: pitch_tab = 0;    1: pitch_tab = 15;   2: pitch_tab = 16;   3: pitch_tab = 17;
         4: pitch_tab = 19;   5: pitch_tab = 21;   6: pitch_tab = 22;   7: pitch_tab = 25;
@@ -50,7 +39,7 @@ function automatic [7:0] pitch_tab(input [4:0] i);         // TI_5110_PITCH
     endcase
 endfunction
 
-function automatic signed [9:0] k_tab(input [3:0] k, input [4:0] i);   // TI_5110_5220_LPC
+function automatic signed [9:0] k_tab(input [3:0] k, input [4:0] i);
     case (k)
     0: case (i)
         0: k_tab = -501;  1: k_tab = -498;  2: k_tab = -497;  3: k_tab = -495;
@@ -117,7 +106,7 @@ function automatic signed [9:0] k_tab(input [3:0] k, input [4:0] i);   // TI_511
     endcase
 endfunction
 
-function automatic signed [7:0] chirp_tab(input [5:0] i);  // TI_LATER_CHIRP (entries 21-51 are 0)
+function automatic signed [7:0] chirp_tab(input [5:0] i);
     case (i)
         0: chirp_tab = 8'h00;  1: chirp_tab = 8'h03;  2: chirp_tab = 8'h0f;  3: chirp_tab = 8'h28;
         4: chirp_tab = 8'h4c;  5: chirp_tab = 8'h6c;  6: chirp_tab = 8'h71;  7: chirp_tab = 8'h50;
@@ -128,20 +117,19 @@ function automatic signed [7:0] chirp_tab(input [5:0] i);  // TI_LATER_CHIRP (en
     endcase
 endfunction
 
-function automatic [1:0] interp_shift(input [2:0] ip);     // TI_INTERP {0,3,3,3,2,2,1,1}
+function automatic [1:0] interp_shift(input [2:0] ip);
     case (ip)
         0: interp_shift = 0; 1, 2, 3: interp_shift = 3; 4, 5: interp_shift = 2; default: interp_shift = 1;
     endcase
 endfunction
 
-function automatic [3:0] field_bits(input [3:0] f);        // E, repeat, P, K1..K10
+function automatic [3:0] field_bits(input [3:0] f);
     case (f)
         0: field_bits = 4; 1: field_bits = 1; 2, 3, 4: field_bits = 5;
         5, 6, 7, 8, 9: field_bits = 4; default: field_bits = 3;
     endcase
 endfunction
 
-// 20 LFSR steps per sample (one per T cycle)
 function automatic [12:0] rng_step20(input [12:0] r);
     reg [12:0] t;
     integer n;
@@ -151,8 +139,6 @@ function automatic [12:0] rng_step20(input [12:0] r);
         rng_step20 = t;
     end
 endfunction
-
-//------------------------------------------------------- State ----------------------------------------------------------------//
 
 localparam CMD_RESET = 3'd0, CMD_LOAD_ADDRESS = 3'd1, CMD_OUTPUT = 3'd2, CMD_SPKSLOW = 3'd3,
            CMD_READ_BIT = 3'd4, CMD_SPEAK = 3'd5, CMD_READ_BRANCH = 3'd6, CMD_TEST_TALK = 3'd7;
@@ -191,13 +177,10 @@ wire new_stop     = new_e == 4'd15;
 wire new_silence  = new_e == 4'd0;
 wire new_unvoiced = new_p == 5'd0;
 
-// lattice: one multiplier, a wrapped to 10 bits, b to 15 bits, (a*b)>>9 (MAME matrix_multiply)
 reg signed [9:0]  mm_a;
 reg signed [14:0] mm_b;
 wire signed [24:0] mm_prod = mm_a * mm_b;
 wire signed [14:0] mm_res  = mm_prod[23:9];
-
-//------------------------------------------------------- Sequencer ------------------------------------------------------------//
 
 localparam S_IDLE = 4'd0, S_START = 4'd1, S_BIT = 4'd2, S_BITWAIT = 4'd3, S_PARSED = 4'd4, S_INTERP = 4'd5,
            S_EXC = 4'd6, S_LAT_OP = 4'd7, S_LAT_ACC = 4'd8, S_OUT = 4'd9, S_CMD = 4'd10, S_CMD_WAIT = 4'd11;
@@ -208,8 +191,8 @@ reg  [3:0] field, nbits;
 reg  [4:0] acc;
 reg        rep;
 reg  [3:0] wait_cnt;
-reg        bit_for_cmd;          // bit read belongs to a command (dummy read / READ_BIT) rather than a frame
-reg        discard_bit;          // dummy read: bit is not shifted into the READ BIT buffer
+reg        bit_for_cmd;
+reg        discard_bit;
 reg  [4:0] lstep;
 reg signed [14:0] uacc;
 
@@ -217,7 +200,6 @@ assign busy = (st != S_IDLE) | sample_pend | cmd_pend;
 
 wire [3:0] kpc = PC - 4'd2;
 
-// interpolation targets for the current PC
 wire        [4:0]  k_idx   = new_k[kpc];
 wire signed [9:0]  tgt_k   = k_tab(kpc, k_idx);
 wire               inh_st  = inhibit & (IP != 3'd0);
@@ -229,7 +211,6 @@ wire signed [10:0] n_e     = $signed({3'b0, cur_e}) + (d_e >>> sh);
 wire signed [10:0] n_p     = $signed({3'b0, cur_p}) + (d_p >>> sh);
 wire signed [10:0] n_k     = cur_k[kpc] + (d_k >>> sh);
 
-// analog clip (MAME clip_analog): 12-bit clamp, low nibble dropped, range-extended to 16 bits
 function automatic signed [15:0] clip_analog(input signed [14:0] s);
     reg signed [11:0] c;
     begin
@@ -254,19 +235,18 @@ endtask
 
 task automatic start_speak(input slow);
     begin
-        SPEN <= 1; TALK <= 1;                       // TALK at once (MAME FAST_START_HACK)
+        SPEN <= 1; TALK <= 1;
         zpar <= 1; uv_zpar <= 1; OLDE <= 1; OLDP <= 1;
         subc_reload <= ~slow;
     end
 endtask
 
-// counters after each sample (RESETF3 / RESETL4)
 task automatic advance_counters(input talking);
     reg pz_now;
     begin
         pz_now = pitch_zero | (talking && subcycle + 2'd1 == 2'd2 && PC == 4'd12 && IP == 3'd7 && inhibit);
         if (subcycle + 2'd1 == 2'd2 && PC == 4'd12) begin
-            if (talking && IP == 3'd7 && inhibit) pitch_zero <= 1;   // also seen by this sample's pitch counter (pz_now)
+            if (talking && IP == 3'd7 && inhibit) pitch_zero <= 1;
             if (IP == 3'd7) begin
                 if (talking) begin OLDE <= new_silence; OLDP <= new_unvoiced; end
                 TALKD <= TALK;
@@ -307,7 +287,6 @@ always_ff @(posedge clk) begin
             st <= S_CMD;
         end
 
-    //------------------------------------------------ one sample (MAME process, size 1)
     S_START:
         if (!TALKD) begin
             advance_counters(0);
@@ -321,7 +300,7 @@ always_ff @(posedge clk) begin
             st <= S_INTERP;
 
     S_BIT: begin
-        m0 <= 1;                                   // falling M0 edge advances the VSM address, then data is read
+        m0 <= 1;
         wait_cnt <= BIT_WAIT[3:0];
         st <= S_BITWAIT;
     end
@@ -337,7 +316,6 @@ always_ff @(posedge clk) begin
                 nbits <= nbits - 4'd1;
                 st <= S_BIT;
             end else begin
-                // field complete
                 case (field)
                     4'd0: new_e <= {acc[2:0], data_bit};
                     4'd1: rep   <= data_bit;
@@ -387,7 +365,6 @@ always_ff @(posedge clk) begin
         st <= S_LAT_OP;
     end
 
-    // lattice: step 0 = energy*excitation, 1-10 = u9..u0, 11-19 = x9..x1
     S_LAT_OP: begin
         if (lstep == 0) begin
             mm_a <= $signed({2'b00, prev_e});
@@ -425,7 +402,6 @@ always_ff @(posedge clk) begin
         st <= S_IDLE;
     end
 
-    //------------------------------------------------ PDC falling edge (MAME PDC_set)
     S_CMD: begin
         st <= S_IDLE;
         case (ctl_state)
@@ -462,7 +438,6 @@ always_ff @(posedge clk) begin
         endcase
     end
 
-    // command tail after any dummy read
     S_CMD_WAIT: begin
         st <= S_IDLE;
         bit_for_cmd <= 0;
@@ -477,7 +452,6 @@ always_ff @(posedge clk) begin
     default: st <= S_IDLE;
     endcase
 
-    // after the case so a request in the same clock as its clear is not lost
     if (!reset) begin
         if (ce_sample) sample_pend <= 1;
         if (pdc_d && !pdc) begin cmd_pend <= 1; cmd_ctl <= ctl; end
